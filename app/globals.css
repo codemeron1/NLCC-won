@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Refined Professional Purple Theme */
+  --color-brand-purple: #9333EA;
+  --color-brand-purple-light: #F5F3FF;
+  --color-brand-sky: #7DD3FC;
+  --color-brand-mint: #6EE7B7;
+  --color-brand-lemon: #FEF9C3;
+  --color-brand-coral: #FCA5A5;
+  --color-brand-lavender: #C4B5FD;
+  --color-brand-orange: #FDBA74;
+  --color-brand-indigo: #818CF8;
+
+  /* Custom Shadows for Premium Feel */
+  --shadow-btn: 0 4px 0 0 rgba(0, 0, 0, 0.1);
+  --shadow-btn-hover: 0 6px 0 0 rgba(0, 0, 0, 0.1);
+  --shadow-card: 0 20px 50px rgba(0, 0, 0, 0.05);
+  --shadow-card-hover: 0 30px 60px rgba(0, 0, 0, 0.08);
+}
+
+@layer base {
+  body {
+    @apply bg-slate-100 text-slate-900 font-sans selection:bg-brand-purple selection:text-white antialiased transition-colors duration-500;
+  }
+
+  .dark body {
+    @apply bg-[#020617] text-slate-200;
+  }
+
+  /* High-visibility focus states for WCAG 2.1 AA/AAA */
+  :focus-visible {
+    @apply outline-none ring-4 ring-brand-purple ring-offset-2 ring-offset-slate-50;
+  }
+  
+  .dark :focus-visible {
+    @apply ring-offset-[#020617];
+  }
+
+  /* Improved contrast for secondary text */
+  .text-slate-400 {
+    @apply text-slate-600;
+  }
+  .dark .text-slate-400 {
+    @apply text-slate-400; /* Revert to lighter on dark */
+  }
+
+  .text-slate-500 {
+    @apply text-slate-700;
+  }
+  .dark .text-slate-500 {
+    @apply text-slate-400;
+  }
+  
+  .dark h1, .dark h2, .dark h3, .dark h4 {
+    @apply text-white;
+  }
+  
+  .dark .bg-white {
+    @apply bg-[#020617];
+  }
+  
+  .dark .bg-slate-50 {
+    @apply bg-slate-900/60;
+  }
+
+  .dark .border-slate-100, .dark .border-slate-200 {
+    @apply border-white/10;
+  }
+
+  .dark .text-slate-900, .dark .text-slate-800, .dark .text-slate-700 {
+    @apply text-white/90;
+  }
+  
+  .dark .text-slate-600 {
+    @apply text-slate-300;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-slate-50/70 backdrop-blur-xl border border-white/40 shadow-xl transition-all;
+  }
+  .dark .glass {
+    @apply bg-slate-900/60 border-white/10 shadow-black/40;
+  }
+
+  .btn-premium {
+    @apply px-8 py-4 rounded-2xl font-black text-lg transition-all duration-300 shadow-btn hover:shadow-btn-hover hover:-translate-y-0.5 active:translate-y-1 active:shadow-none flex items-center justify-center gap-2;
+  }
+
+  .card-premium {
+    @apply bg-slate-50 rounded-[2rem] p-8 shadow-card border border-slate-200 hover:shadow-card-hover hover:-translate-y-1 transition-all duration-500;
+  }
+  .dark .card-premium {
+    @apply bg-slate-900/40 border-slate-800 shadow-2xl shadow-black/20;
+  }
+
+  .bubble-premium {
+    @apply relative bg-slate-50 p-6 rounded-3xl shadow-lg border-2 border-slate-200 text-lg font-bold text-slate-700 leading-relaxed transition-all;
+  }
+  .dark .bubble-premium {
+    @apply bg-slate-900 border-slate-800 text-slate-300;
+  }
+}
+
+/* More refined animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-15px) rotate(1deg); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.02); opacity: 0.95; }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 4s ease-in-out infinite;
+}
+
+/* Pattern backgrounds */
+.bg-pattern {
+  background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.dark .bg-pattern {
+  background-image: radial-gradient(#1e293b 1px, transparent 1px);
+}

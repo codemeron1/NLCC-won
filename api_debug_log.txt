@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-03-19T17:13:41.954Z",
+  "rawRows": 7,
+  "teacherIdRequested": "d7b4cbd1-df40-43a6-9301-0bd1b311c335",
+  "dbUrlExists": true,
+  "firstFewUsers": [
+    {
+      "id": "8fe9c12e-9b6e-4112-a2bc-2ed3a9aebee4",
+      "first_name": "Lejeune",
+      "last_name": "Daseco",
+      "email": "Lejeune@gmail.com",
+      "role": "USER",
+      "progress": "0",
+      "last_active": "2026-03-19T17:12:07.397Z"
+    },
+    {
+      "id": "0d3a669e-7a75-4dc5-afbf-6534f8b0f58b",
+      "first_name": "Teacher1",
+      "last_name": "NoOne",
+      "email": "archelly.bautista@deped.gov.ph",
+      "role": "TEACHER",
+      "progress": "0",
+      "last_active": null
+    },
+    {
+      "id": "9c000759-37f5-42cd-ba35-59f2e7e1f84c",
+      "first_name": "Alexander",
+      "last_name": "Llavares",
+      "email": "bautistaarchelly8@gmail.com",
+      "role": "USER",
+      "progress": "0",
+      "last_active": null
+    }
+  ]
+}

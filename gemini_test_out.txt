@@ -1,0 +1,13 @@
+Using API Key starting with: AIzaSyDe
+(node:18576) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+--- DETAILED ERROR START ---
+Message: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+Status: 404
+Stack: Error: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+    at handleResponseNotOk (file:///D:/nllc/node_modules/@google/generative-ai/dist/index.mjs:432:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async makeRequest (file:///D:/nllc/node_modules/@google/generative-ai/dist/index.mjs:401:9)
+    at async generateContent (file:///D:/nllc/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async testGemini (file:///D:/nllc/scripts/test-gemini.mjs:17:24)
+--- DETAILED ERROR END ---
