@@ -33,6 +33,7 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
     const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
     const [selectedClassName, setSelectedClassName] = useState<string>('');
     const [classBahagi, setClassBahagi] = useState<any[]>([]);
+    const [classLessons, setClassLessons] = useState<any[]>([]);
 
     // Form states
     const [showBahagiForm, setShowBahagiForm] = useState(false);
@@ -128,24 +129,45 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
         if (selectedClass) {
             setSelectedClassId(classId);
             setSelectedClassName(selectedClass.name);
-            // Load Bahagi for this class
+            // Load Bahagi and Lessons for this class
             try {
-                const url = new URL('/api/teacher/class-bahagi', window.location.origin);
-                url.searchParams.append('classId', classId);
-                url.searchParams.append('className', selectedClass.name);
+                const bahagiUrl = new URL('/api/teacher/class-bahagi', window.location.origin);
+                bahagiUrl.searchParams.append('classId', classId);
+                bahagiUrl.searchParams.append('className', selectedClass.name);
                 
-                const res = await fetch(url.toString());
-                if (res.ok) {
-                    const data = await res.json();
-                    console.log(`Loaded ${data.bahagi?.length || 0} bahagi for class ${selectedClass.name}`);
-                    setClassBahagi(data.bahagi || []);
+                const lessonsUrl = new URL('/api/teacher/class-lessons', window.location.origin);
+                lessonsUrl.searchParams.append('classId', classId);
+                lessonsUrl.searchParams.append('className', selectedClass.name);
+
+                // Fetch both in parallel
+                const [bahagiRes, lessonsRes] = await Promise.all([
+                    fetch(bahagiUrl.toString()),
+                    fetch(lessonsUrl.toString())
+                ]);
+
+                // Handle bahagi response
+                if (bahagiRes.ok) {
+                    const bahagiData = await bahagiRes.json();
+                    console.log(`Loaded ${bahagiData.bahagi?.length || 0} bahagi for class ${selectedClass.name}`);
+                    setClassBahagi(bahagiData.bahagi || []);
                 } else {
                     console.warn('Failed to fetch bahagi');
                     setClassBahagi([]);
                 }
+
+                // Handle lessons response
+                if (lessonsRes.ok) {
+                    const lessonsData = await lessonsRes.json();
+                    console.log(`Loaded ${lessonsData.lessons?.length || 0} lessons for class ${selectedClass.name}`);
+                    setClassLessons(lessonsData.lessons || []);
+                } else {
+                    console.warn('Failed to fetch lessons');
+                    setClassLessons([]);
+                }
             } catch (err) {
-                console.error('Error fetching bahagi:', err);
+                console.error('Error fetching class data:', err);
                 setClassBahagi([]);
+                setClassLessons([]);
             }
         }
     };
@@ -155,6 +177,7 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
         setSelectedClassId(null);
         setSelectedClassName('');
         setClassBahagi([]);
+        setClassLessons([]);
     };
 
     // Handle creating bahagi (show modal)
@@ -469,7 +492,7 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
                             onDeleteYunit={handleDeleteYunit}
                             onDeleteAssessment={handleDeleteAssessment}
                             bahagi={classBahagi}
-                            lessons={lessons}
+                            lessons={classLessons}
                             onDeleteLesson={handleDeleteLesson}
                         />
                     ) : (

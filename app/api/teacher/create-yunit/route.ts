@@ -6,33 +6,48 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('CREATE YUNIT - Received body:', body);
     
-    const { title, content, mediaUrl, classId, lessonId, teacherId } = body;
+    const { bahagiId, title, description, discussion, mediaUrl } = body;
 
     console.log('CREATE YUNIT - Parsed params:', {
+      bahagiId: bahagiId || 'MISSING',
       title: title ? `"${title}"` : 'MISSING',
-      content: content ? `"${content.substring(0, 50)}..."` : 'MISSING',
-      mediaUrl: mediaUrl || 'not provided',
-      classId: classId || 'not provided',
-      lessonId: lessonId || 'MISSING',
-      teacherId: teacherId || 'MISSING'
+      description: description || 'not provided',
+      discussion: discussion ? `"${discussion.substring(0, 50)}..."` : 'not provided',
+      mediaUrl: mediaUrl || 'not provided'
     });
 
-    if (!title || !content || !lessonId || !teacherId) {
+    if (!bahagiId || !title) {
       return NextResponse.json(
-        { error: 'Title, content, lesson ID, and teacher ID are required' },
+        { error: 'Bahagi ID and title are required' },
         { status: 400 }
       );
     }
 
-    // Create yunit in database
-    console.log('CREATE YUNIT - About to INSERT with params:', [title, content, mediaUrl || null, lessonId, classId || null, teacherId]);
+    // Create yunit (lesson) in database
+    console.log('CREATE YUNIT - About to INSERT into lesson table');
     
-    const result = await query(
-      `INSERT INTO yunits (title, content, media_url, lesson_id, class_id, teacher_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-       RETURNING id, title, content, media_url, lesson_id, class_id, teacher_id, created_at, updated_at`,
-      [title, content, mediaUrl || null, lessonId, classId || null, teacherId]
-    );
+    // Try with media_url column, fall back if it doesn't exist
+    let result;
+    try {
+      result = await query(
+        `INSERT INTO lesson (bahagi_id, title, subtitle, discussion, media_url, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+         RETURNING id, bahagi_id, title, subtitle, discussion, media_url, created_at, updated_at`,
+        [bahagiId, title, description || null, discussion || null, mediaUrl || null]
+      );
+    } catch (e: any) {
+      // If media_url column doesn't exist, try without it
+      if (e.message?.includes('media_url') || e.message?.includes('unknown column') || e.message?.includes('column')) {
+        result = await query(
+          `INSERT INTO lesson (bahagi_id, title, subtitle, discussion, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, NOW(), NOW())
+           RETURNING id, bahagi_id, title, subtitle, discussion, created_at, updated_at`,
+          [bahagiId, title, description || null, discussion || null]
+        );
+      } else {
+        throw e;
+      }
+    }
 
     console.log('CREATE YUNIT - Query result:', result);
 
@@ -50,8 +65,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       yunit: {
         id: yunitData.id,
+        bahagi_id: yunitData.bahagi_id,
         title: yunitData.title,
-        content: yunitData.content,
+        subtitle: yunitData.subtitle,
+        discussion: yunitData.discussion,
         mediaUrl: yunitData.media_url,
         created_at: yunitData.created_at
       }

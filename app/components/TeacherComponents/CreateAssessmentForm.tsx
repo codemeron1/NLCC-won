@@ -6,8 +6,8 @@ interface CreateAssessmentFormProps {
     isOpen: boolean;
     onClose: () => void;
     onSubmit: (data: any) => void;
-    classId: string;
-    lessonId: string;
+    bahagiId: number;
+    bahagiTitle: string;
     isLoading?: boolean;
 }
 
@@ -15,8 +15,8 @@ export const CreateAssessmentForm: React.FC<CreateAssessmentFormProps> = ({
     isOpen,
     onClose,
     onSubmit,
-    classId,
-    lessonId,
+    bahagiId,
+    bahagiTitle,
     isLoading = false
 }) => {
     const [assessmentType, setAssessmentType] = useState<'multiple-choice' | 'short-answer' | 'checkbox' | 'media-audio' | 'scramble' | 'matching'>('multiple-choice');
@@ -35,12 +35,12 @@ export const CreateAssessmentForm: React.FC<CreateAssessmentFormProps> = ({
         }
 
         const data = {
+            bahagiId,
             title,
             type: assessmentType,
             instructions,
             reward: parseInt(reward),
-            classId,
-            lessonId,
+            points: parseInt(reward),
             questions
         };
 

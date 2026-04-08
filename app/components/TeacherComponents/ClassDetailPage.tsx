@@ -1,10 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { EnhancedBahagiCard } from './EnhancedBahagiCard';
+import { CreateYunitForm } from './CreateYunitForm';
+import { CreateAssessmentForm } from './CreateAssessmentForm';
+import { EditBahagiForm } from './EditBahagiForm';
+import { EditYunitForm } from './EditYunitForm';
+import { EditAssessmentForm } from './EditAssessmentForm';
 
 interface ClassDetailPageProps {
     classId: string;
     className: string;
+    teacherId?: string;
     onBack: () => void;
     onCreateBahagi: () => void;
     onCreateLesson?: () => void;
@@ -23,6 +30,7 @@ interface ClassDetailPageProps {
 export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
     classId,
     className,
+    teacherId,
     onBack,
     onCreateBahagi,
     onCreateLesson,
@@ -38,6 +46,331 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
     onDeleteLesson
 }) => {
     const [expandedBahagiId, setExpandedBahagiId] = useState<number | null>(null);
+    const [showYunitForm, setShowYunitForm] = useState(false);
+    const [showAssessmentForm, setShowAssessmentForm] = useState(false);
+    const [showEditBahagiForm, setShowEditBahagiForm] = useState(false);
+    const [showEditYunitForm, setShowEditYunitForm] = useState(false);
+    const [showEditAssessmentForm, setShowEditAssessmentForm] = useState(false);
+    const [selectedBahagiForYunit, setSelectedBahagiForYunit] = useState<any>(null);
+    const [selectedBahagiForAssessment, setSelectedBahagiForAssessment] = useState<any>(null);
+    const [editingBahagi, setEditingBahagi] = useState<any>(null);
+    const [editingYunit, setEditingYunit] = useState<any>(null);
+    const [editingAssessment, setEditingAssessment] = useState<any>(null);
+    const [bahagiYunits, setBahagiYunits] = useState<Record<number, any[]>>({});
+    const [bahagiAssessments, setBahagiAssessments] = useState<Record<number, any[]>>({});
+    const [isLoadingYunits, setIsLoadingYunits] = useState(false);
+    const [isLoadingAssessments, setIsLoadingAssessments] = useState(false);
+    const [isCreatingYunit, setIsCreatingYunit] = useState(false);
+    const [isCreatingAssessment, setIsCreatingAssessment] = useState(false);
+    const [isEditingBahagi, setIsEditingBahagi] = useState(false);
+    const [isEditingYunit, setIsEditingYunit] = useState(false);
+    const [isEditingAssessment, setIsEditingAssessment] = useState(false);
+
+    // Fetch yunits for a bahagi
+    const fetchYunitsForBahagi = async (bahagiId: number) => {
+        setIsLoadingYunits(true);
+        try {
+            const res = await fetch(`/api/teacher/manage-yunit?bahagiId=${bahagiId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setBahagiYunits(prev => ({
+                    ...prev,
+                    [bahagiId]: data.yunits || []
+                }));
+            }
+        } catch (err) {
+            console.error('Error fetching yunits:', err);
+        } finally {
+            setIsLoadingYunits(false);
+        }
+    };
+
+    // Fetch assessments for a bahagi
+    const fetchAssessmentsForBahagi = async (bahagiId: number) => {
+        setIsLoadingAssessments(true);
+        try {
+            const res = await fetch(`/api/teacher/manage-assessment?bahagiId=${bahagiId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setBahagiAssessments(prev => ({
+                    ...prev,
+                    [bahagiId]: data.assessments || []
+                }));
+            }
+        } catch (err) {
+            console.error('Error fetching assessments:', err);
+        } finally {
+            setIsLoadingAssessments(false);
+        }
+    };
+
+    // Handle expanding a bahagi
+    const handleToggleBahagiExpand = (bahagiId: number) => {
+        if (expandedBahagiId === bahagiId) {
+            setExpandedBahagiId(null);
+        } else {
+            setExpandedBahagiId(bahagiId);
+            // Load yunits and assessments when expanding
+            if (!bahagiYunits[bahagiId]) {
+                fetchYunitsForBahagi(bahagiId);
+            }
+            if (!bahagiAssessments[bahagiId]) {
+                fetchAssessmentsForBahagi(bahagiId);
+            }
+        }
+    };
+
+    // Handle creating yunit
+    const handleCreateYunit = (bahagiObj: any) => {
+        setSelectedBahagiForYunit(bahagiObj);
+        setShowYunitForm(true);
+    };
+
+    const handleYunitSubmit = async (data: any) => {
+        setIsCreatingYunit(true);
+        try {
+            const res = await fetch('/api/teacher/manage-yunit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bahagiId: data.bahagiId,
+                    title: data.title,
+                    description: data.description,
+                    discussion: data.discussion,
+                    mediaUrl: data.mediaUrl
+                })
+            });
+
+            if (res.ok) {
+                const result = await res.json();
+                alert('✅ Yunit created successfully!');
+                setShowYunitForm(false);
+                // Refresh yunits
+                fetchYunitsForBahagi(data.bahagiId);
+            } else {
+                const error = await res.json();
+                alert(`❌ Error: ${error.error}`);
+            }
+        } catch (err) {
+            console.error('Error creating yunit:', err);
+            alert('❌ Failed to create yunit');
+        } finally {
+            setIsCreatingYunit(false);
+        }
+    };
+
+    // Handle creating assessment
+    const handleCreateAssessment = (bahagiObj: any) => {
+        setSelectedBahagiForAssessment(bahagiObj);
+        setShowAssessmentForm(true);
+    };
+
+    const handleAssessmentSubmit = async (data: any) => {
+        setIsCreatingAssessment(true);
+        try {
+            const res = await fetch('/api/teacher/manage-assessment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bahagiId: data.bahagiId,
+                    lessonId: data.lessonId,
+                    title: data.title,
+                    type: data.type,
+                    options: data.options,
+                    correctAnswer: data.correctAnswer,
+                    points: data.points
+                })
+            });
+
+            if (res.ok) {
+                const result = await res.json();
+                alert('✅ Assessment created successfully!');
+                setShowAssessmentForm(false);
+                // Refresh assessments
+                fetchAssessmentsForBahagi(data.bahagiId);
+            } else {
+                const error = await res.json();
+                alert(`❌ Error: ${error.error}`);
+            }
+        } catch (err) {
+            console.error('Error creating assessment:', err);
+            alert('❌ Failed to create assessment');
+        } finally {
+            setIsCreatingAssessment(false);
+        }
+    };
+
+    // Handle editing bahagi
+    const handleEditBahagi = async (bahagiId: number) => {
+        const bahagiToEdit = bahagi.find(b => b.id === bahagiId);
+        if (bahagiToEdit) {
+            setEditingBahagi(bahagiToEdit);
+            setShowEditBahagiForm(true);
+        }
+    };
+
+    const handleBahagiEditSubmit = async (data: any) => {
+        setIsEditingBahagi(true);
+        try {
+            const res = await fetch('/api/teacher/update-bahagi', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                alert('✅ Bahagi updated successfully!');
+                setShowEditBahagiForm(false);
+                onCreateBahagi();
+            } else {
+                const error = await res.json();
+                alert(`❌ Error: ${error.error}`);
+            }
+        } catch (err) {
+            console.error('Error updating bahagi:', err);
+            alert('❌ Failed to update bahagi');
+        } finally {
+            setIsEditingBahagi(false);
+        }
+    };
+
+    // Handle editing yunit
+    const handleEditYunit = (yunit: any) => {
+        setEditingYunit(yunit);
+        setShowEditYunitForm(true);
+    };
+
+    const handleYunitEditSubmit = async (data: any) => {
+        setIsEditingYunit(true);
+        try {
+            const res = await fetch('/api/teacher/update-yunit', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                alert('✅ Yunit updated successfully!');
+                setShowEditYunitForm(false);
+                // Refresh yunits
+                fetchYunitsForBahagi(editingYunit.bahagi_id);
+            } else {
+                const error = await res.json();
+                alert(`❌ Error: ${error.error}`);
+            }
+        } catch (err) {
+            console.error('Error updating yunit:', err);
+            alert('❌ Failed to update yunit');
+        } finally {
+            setIsEditingYunit(false);
+        }
+    };
+
+    // Handle editing assessment
+    const handleEditAssessment = (assessment: any) => {
+        setEditingAssessment(assessment);
+        setShowEditAssessmentForm(true);
+    };
+
+    const handleAssessmentEditSubmit = async (data: any) => {
+        setIsEditingAssessment(true);
+        try {
+            const res = await fetch('/api/teacher/update-assessment', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                alert('✅ Assessment updated successfully!');
+                setShowEditAssessmentForm(false);
+                // Refresh assessments
+                fetchAssessmentsForBahagi(editingAssessment.bahagi_id);
+            } else {
+                const error = await res.json();
+                alert(`❌ Error: ${error.error}`);
+            }
+        } catch (err) {
+            console.error('Error updating assessment:', err);
+            alert('❌ Failed to update assessment');
+        } finally {
+            setIsEditingAssessment(false);
+        }
+    };
+
+    // Handle archiving bahagi
+    const handleArchiveBahagi = async (bahagiId: number) => {
+        try {
+            const res = await fetch('/api/teacher/archive-bahagi', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: bahagiId,
+                    isArchived: true
+                })
+            });
+
+            if (res.ok) {
+                alert('✅ Bahagi archived successfully!');
+                onCreateBahagi();
+            } else {
+                const error = await res.json();
+                alert(`❌ Error: ${error.error}`);
+            }
+        } catch (err) {
+            console.error('Error archiving bahagi:', err);
+            alert('❌ Failed to archive bahagi');
+        }
+    };
+
+    // Handle deleting bahagi
+    const handleDeleteBahagi = async (bahagiId: number) => {
+        if (!window.confirm('⚠️ Are you sure? This will permanently delete the Bahagi and all related Yunits and Assessments.')) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/teacher/delete-bahagi?id=${bahagiId}`, {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                alert('✅ Bahagi deleted permanently!');
+                onCreateBahagi();
+            } else {
+                const error = await res.json();
+                alert(`❌ Error: ${error.error}`);
+            }
+        } catch (err) {
+            console.error('Error deleting bahagi:', err);
+            alert('❌ Failed to delete bahagi');
+        }
+    };
+
+    // Handle toggling publish status
+    const handleTogglePublish = async (bahagiId: number, currentStatus: boolean) => {
+        try {
+            const res = await fetch('/api/teacher/update-bahagi', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: bahagiId,
+                    isPublished: !currentStatus
+                })
+            });
+
+            if (res.ok) {
+                alert(`✅ Bahagi ${!currentStatus ? 'published' : 'unpublished'}!`);
+                onCreateBahagi();
+            } else {
+                const error = await res.json();
+                alert(`❌ Error: ${error.error}`);
+            }
+        } catch (err) {
+            console.error('Error toggling publish:', err);
+            alert('❌ Failed to update publish status');
+        }
+    };
 
     return (
         <div className="flex flex-col gap-8 animate-in fade-in duration-700">
@@ -64,14 +397,6 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
                 >
                     <span>📚</span> Add Bahagi
                 </button>
-                {onCreateLesson && (
-                    <button
-                        onClick={onCreateLesson}
-                        className="bg-brand-purple hover:bg-brand-purple/80 text-white px-6 py-3 rounded-xl font-black text-sm uppercase tracking-widest transition-all shadow-lg shadow-purple-500/20 flex items-center gap-2"
-                    >
-                        <span>📖</span> Create Lesson
-                    </button>
-                )}
                 <button
                     disabled
                     className="bg-brand-sky/30 text-brand-sky px-6 py-3 rounded-xl font-black text-sm uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"
@@ -93,56 +418,166 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
                 {bahagi.length > 0 ? (
                     <div className="space-y-4">
                         {bahagi.map((b) => (
-                            <div
+                            <EnhancedBahagiCard
                                 key={b.id}
-                                className="bg-slate-900/50 border border-slate-800/50 rounded-4xl overflow-hidden group hover:border-brand-purple/30 transition-all"
+                                bahagi={b}
+                                isExpanded={expandedBahagiId === b.id}
+                                onToggleExpand={() => handleToggleBahagiExpand(b.id)}
+                                onEdit={() => handleEditBahagi(b.id)}
+                                onArchive={() => handleArchiveBahagi(b.id)}
+                                onDelete={() => handleDeleteBahagi(b.id)}
+                                onTogglePublish={(isPublished) => handleTogglePublish(b.id, isPublished)}
+                                onCreateYunit={() => handleCreateYunit(b)}
                             >
-                                {/* Bahagi Header */}
-                                <button
-                                    onClick={() => setExpandedBahagiId(expandedBahagiId === b.id ? null : b.id)}
-                                    className="w-full p-6 flex items-center justify-between hover:bg-slate-800/30 transition-colors"
-                                >
-                                    <div className="flex items-center gap-4 text-left flex-1">
-                                        <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-xl border border-slate-700 group-hover:border-brand-purple/30 transition-all">
-                                            📕
-                                        </div>
-                                        <div className="flex-1">
-                                            <h4 className="text-xl font-black text-white group-hover:text-brand-purple transition-colors">
-                                                {b.title}
-                                            </h4>
-                                            <p className="text-sm text-slate-500 font-bold mt-1">Yunit: {b.yunit || 'Yunit 1'}</p>
-                                            <div className="flex gap-4 mt-3">
-                                                <span className="text-[10px] font-black text-brand-sky uppercase tracking-wider">
-                                                    Click to expand
+                                {/* Yunits Section */}
+                                {expandedBahagiId === b.id && (
+                                    <div className="space-y-4">
+                                        {/* Yunits */}
+                                        <div>
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h5 className="text-lg font-black text-white">📖 Yunits</h5>
+                                                <span className="text-xs font-black text-slate-500 bg-slate-900 px-3 py-1 rounded">
+                                                    {bahagiYunits[b.id]?.length || 0}
                                                 </span>
                                             </div>
+                                            {isLoadingYunits ? (
+                                                <p className="text-slate-500 text-sm">Loading yunits...</p>
+                                            ) : bahagiYunits[b.id]?.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    {bahagiYunits[b.id].map((yunit: any) => (
+                                                        <div
+                                                            key={yunit.id}
+                                                            className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 flex items-start justify-between"
+                                                        >
+                                                            <div className="flex-1">
+                                                                <p className="text-sm font-bold text-white">{yunit.title}</p>
+                                                                <p className="text-xs text-slate-400 mt-1">{yunit.subtitle}</p>
+                                                                <div className="flex gap-2 mt-2">
+                                                                    <span
+                                                                        className={`text-[9px] font-black uppercase px-2 py-1 rounded ${
+                                                                            yunit.is_published
+                                                                                ? 'bg-green-900/30 text-green-400'
+                                                                                : 'bg-orange-900/30 text-orange-400'
+                                                                        }`}
+                                                                    >
+                                                                        {yunit.is_published ? '✓ Published' : '○ Draft'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    className="px-2 py-1 text-xs bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 rounded transition-all"
+                                                                    onClick={() => handleEditYunit(yunit)}
+                                                                    title="Edit Yunit"
+                                                                >
+                                                                    ✏️
+                                                                </button>
+                                                                <button
+                                                                    className="px-2 py-1 text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded transition-all"
+                                                                    onClick={async () => {
+                                                                        if (confirm('Delete this Yunit?')) {
+                                                                            const res = await fetch(`/api/teacher/delete-yunit?id=${yunit.id}`, {
+                                                                                method: 'DELETE'
+                                                                            });
+                                                                            if (res.ok) {
+                                                                                alert('✅ Yunit deleted!');
+                                                                                fetchYunitsForBahagi(b.id);
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                    title="Delete Yunit"
+                                                                >
+                                                                    🗑️
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-slate-600 italic">No yunits yet</p>
+                                            )}
+                                        </div>
+
+                                        {/* Assessments */}
+                                        <div className="border-t border-slate-700/50 pt-4">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h5 className="text-lg font-black text-white">⭐ Assessments</h5>
+                                                <span className="text-xs font-black text-slate-500 bg-slate-900 px-3 py-1 rounded">
+                                                    {bahagiAssessments[b.id]?.length || 0}
+                                                </span>
+                                            </div>
+                                            {isLoadingAssessments ? (
+                                                <p className="text-slate-500 text-sm">Loading assessments...</p>
+                                            ) : bahagiAssessments[b.id]?.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    {bahagiAssessments[b.id].map((assessment: any) => (
+                                                        <div
+                                                            key={assessment.id}
+                                                            className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 flex items-start justify-between"
+                                                        >
+                                                            <div className="flex-1">
+                                                                <p className="text-sm font-bold text-white">{assessment.title}</p>
+                                                                <div className="flex gap-2 mt-2">
+                                                                    <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-slate-700/50 text-slate-300">
+                                                                        {assessment.type}
+                                                                    </span>
+                                                                    <span className="text-[9px] font-black text-brand-sky">
+                                                                        ⭐ {assessment.points} pts
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    className="px-2 py-1 text-xs bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 rounded transition-all"
+                                                                    onClick={() => handleEditAssessment(assessment)}
+                                                                    title="Edit Assessment"
+                                                                >
+                                                                    ✏️
+                                                                </button>
+                                                                <button
+                                                                    className="px-2 py-1 text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded transition-all"
+                                                                    onClick={async () => {
+                                                                        if (confirm('Delete this Assessment?')) {
+                                                                            const res = await fetch(`/api/teacher/delete-assessment?id=${assessment.id}`, {
+                                                                                method: 'DELETE'
+                                                                            });
+                                                                            if (res.ok) {
+                                                                                alert('✅ Assessment deleted!');
+                                                                                fetchAssessmentsForBahagi(b.id);
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                    title="Delete Assessment"
+                                                                >
+                                                                    🗑️
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-slate-600 italic">No assessments yet</p>
+                                            )}
+                                        </div>
+
+                                        {/* Add Yunit/Assessment Buttons */}
+                                        <div className="border-t border-slate-700/50 pt-4 flex gap-2">
+                                            <button
+                                                onClick={() => handleCreateYunit(b)}
+                                                className="flex-1 text-center text-xs font-black text-brand-sky hover:text-white uppercase tracking-widest px-4 py-2 rounded-lg border border-brand-sky/30 hover:bg-brand-sky/10 transition-all"
+                                            >
+                                                + Add Yunit
+                                            </button>
+                                            <button
+                                                onClick={() => handleCreateAssessment(b)}
+                                                className="flex-1 text-center text-xs font-black text-brand-sky hover:text-white uppercase tracking-widest px-4 py-2 rounded-lg border border-brand-sky/30 hover:bg-brand-sky/10 transition-all"
+                                            >
+                                                + Add Assessment
+                                            </button>
                                         </div>
                                     </div>
-                                    <div className="text-2xl transition-transform" style={{
-                                        transform: expandedBahagiId === b.id ? 'rotate(180deg)' : 'rotate(0deg)'
-                                    }}>
-                                        ▼
-                                    </div>
-                                </button>
-
-                                {/* Expanded Content */}
-                                {expandedBahagiId === b.id && (
-                                    <div className="border-t border-slate-800/50 bg-slate-950/50 p-6 space-y-4">
-                                        <p className="text-sm text-slate-400 italic">
-                                            Bahagi ID: {b.id} | Teacher: {b.teacher_id}
-                                        </p>
-                                        <button
-                                            onClick={() => onCreateYunit?.(b.id)}
-                                            className="w-full text-center text-xs font-black text-brand-sky hover:text-white uppercase tracking-widest px-4 py-2 rounded-lg border border-brand-sky/30 hover:bg-brand-sky/10 transition-all"
-                                        >
-                                            + Add Yunit to this Bahagi
-                                        </button>
-                                        <p className="text-xs text-slate-600 text-center italic">
-                                            Yunits and Assessments for this Bahagi will appear here after being created.
-                                        </p>
-                                    </div>
                                 )}
-                            </div>
+                            </EnhancedBahagiCard>
                         ))}
                     </div>
                 ) : (
@@ -153,6 +588,59 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* Yunit Form Modal */}
+            <CreateYunitForm
+                isOpen={showYunitForm}
+                onClose={() => setShowYunitForm(false)}
+                onSubmit={handleYunitSubmit}
+                bahagiId={selectedBahagiForYunit?.id || 0}
+                bahagiTitle={selectedBahagiForYunit?.title || ''}
+                isLoading={isCreatingYunit}
+            />
+
+            {/* Assessment Form Modal */}
+            <CreateAssessmentForm
+                isOpen={showAssessmentForm}
+                onClose={() => setShowAssessmentForm(false)}
+                onSubmit={handleAssessmentSubmit}
+                bahagiId={selectedBahagiForAssessment?.id || 0}
+                bahagiTitle={selectedBahagiForAssessment?.title || ''}
+                isLoading={isCreatingAssessment}
+            />
+
+            {/* Edit Bahagi Form Modal */}
+            {editingBahagi && (
+                <EditBahagiForm
+                    isOpen={showEditBahagiForm}
+                    onClose={() => setShowEditBahagiForm(false)}
+                    onSubmit={handleBahagiEditSubmit}
+                    bahagi={editingBahagi}
+                    isLoading={isEditingBahagi}
+                />
+            )}
+
+            {/* Edit Yunit Form Modal */}
+            {editingYunit && (
+                <EditYunitForm
+                    isOpen={showEditYunitForm}
+                    onClose={() => setShowEditYunitForm(false)}
+                    onSubmit={handleYunitEditSubmit}
+                    yunit={editingYunit}
+                    isLoading={isEditingYunit}
+                />
+            )}
+
+            {/* Edit Assessment Form Modal */}
+            {editingAssessment && (
+                <EditAssessmentForm
+                    isOpen={showEditAssessmentForm}
+                    onClose={() => setShowEditAssessmentForm(false)}
+                    onSubmit={handleAssessmentEditSubmit}
+                    assessment={editingAssessment}
+                    isLoading={isEditingAssessment}
+                />
+            )}
         </div>
     );
 };

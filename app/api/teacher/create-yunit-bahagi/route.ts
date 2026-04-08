@@ -4,11 +4,11 @@ import { query } from '@/lib/db';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, content, mediaUrl, bahagiId, teacherId } = body;
+    const { title, description, discussion, mediaUrl, bahagiId } = body;
 
-    if (!title || !content || !bahagiId || !teacherId) {
+    if (!title || !bahagiId) {
       return NextResponse.json(
-        { error: 'Title, content, bahagi ID, and teacher ID are required' },
+        { error: 'Title and bahagi ID are required' },
         { status: 400 }
       );
     }
@@ -26,13 +26,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create yunit linked to bahagi
-    const result = await query(
-      `INSERT INTO yunits (title, content, media_url, bahagi_id, teacher_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-       RETURNING id, title, content, media_url, bahagi_id, teacher_id, created_at`,
-      [title, content, mediaUrl || null, bahagiId, teacherId]
-    );
+    // Create yunit (lesson) linked to bahagi
+    let result;
+    try {
+      result = await query(
+        `INSERT INTO lesson (bahagi_id, title, subtitle, discussion, media_url, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+         RETURNING id, bahagi_id, title, subtitle, discussion, media_url, created_at`,
+        [bahagiId, title, description || null, discussion || null, mediaUrl || null]
+      );
+    } catch (e: any) {
+      // If media_url column doesn't exist, try without it
+      if (e.message?.includes('media_url') || e.message?.includes('unknown column') || e.message?.includes('column')) {
+        result = await query(
+          `INSERT INTO lesson (bahagi_id, title, subtitle, discussion, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, NOW(), NOW())
+           RETURNING id, bahagi_id, title, subtitle, discussion, created_at`,
+          [bahagiId, title, description || null, discussion || null]
+        );
+      } else {
+        throw e;
+      }
+    }
 
     if (!result.rows || result.rows.length === 0) {
       return NextResponse.json(
