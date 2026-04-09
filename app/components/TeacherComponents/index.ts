@@ -7,3 +7,6 @@ export { TeacherProfilePage } from './TeacherProfilePage';
 export { CreateBahagiForm } from './CreateBahagiForm';
 export { CreateYunitForm } from './CreateYunitForm';
 export { CreateAssessmentForm } from './CreateAssessmentForm';
+export { EditAssessmentV2Form } from './EditAssessmentV2Form';
+export { BahagiIconSelector } from './BahagiIconSelector';
+export { EnhancedBahagiCardV2 } from './EnhancedBahagiCardV2';

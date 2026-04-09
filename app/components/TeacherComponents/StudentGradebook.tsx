@@ -212,7 +212,7 @@ export const StudentGradebook: React.FC<StudentGradebookProps> = ({
               <Tooltip
                 contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155' }}
                 labelStyle={{ color: '#fff' }}
-                formatter={(value) => `${value.toFixed(1)}%`}
+                formatter={(value: any) => value ? `${value.toFixed(1)}%` : '-'}
               />
               <Line
                 type="monotone"

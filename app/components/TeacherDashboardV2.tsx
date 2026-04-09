@@ -185,6 +185,28 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
         setShowBahagiForm(true);
     };
 
+    // Handle refreshing bahagi list after edit
+    const handleRefreshBahagi = async () => {
+        if (!selectedClassId) return;
+        try {
+            const selectedClass = classes.find(c => c.id === selectedClassId);
+            if (!selectedClass) return;
+
+            const bahagiUrl = new URL('/api/teacher/class-bahagi', window.location.origin);
+            bahagiUrl.searchParams.append('classId', selectedClassId);
+            bahagiUrl.searchParams.append('className', selectedClass.name);
+
+            const bahagiRes = await fetch(bahagiUrl.toString());
+            if (bahagiRes.ok) {
+                const bahagiData = await bahagiRes.json();
+                setClassBahagi(bahagiData.bahagi || []);
+                console.log('✅ Bahagi list refreshed');
+            }
+        } catch (err) {
+            console.error('Failed to refresh bahagi:', err);
+        }
+    };
+
     // Handle bahagi form submission
     const handleBahagiSubmit = async (data: any) => {
         try {
@@ -483,7 +505,8 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
                             className={selectedClassName}
                             onBack={handleBackFromClassDetail}
                             onCreateBahagi={handleCreateBahagi}
-                            onCreateLessonLegs={handleCreateLesson}
+                            onRefreshBahagi={handleRefreshBahagi}
+                            onCreateLesson={handleCreateLesson}
                             onCreateYunit={handleCreateYunit}
                             onCreateAssessment={handleCreateAssessment}
                             onEditLesson={handleEditLesson}
@@ -552,30 +575,30 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
             )}
 
             {/* Yunit Form Modal */}
-            {showYunitForm && selectedLessonId && (
+            {showYunitForm && selectedBahagiId && (
                 <CreateYunitForm
                     isOpen={showYunitForm}
                     onClose={() => {
                         setShowYunitForm(false);
-                        setSelectedLessonId(null);
+                        setSelectedBahagiId(null);
                     }}
                     onSubmit={handleYunitSubmit}
-                    classId={selectedClassId || ''}
-                    lessonId={selectedLessonId}
+                    bahagiId={selectedBahagiId}
+                    bahagiTitle={classBahagi.find(b => b.id === selectedBahagiId)?.title || ''}
                 />
             )}
 
             {/* Assessment Form Modal */}
-            {showAssessmentForm && selectedLessonId && (
+            {showAssessmentForm && selectedBahagiId && (
                 <CreateAssessmentForm
                     isOpen={showAssessmentForm}
                     onClose={() => {
                         setShowAssessmentForm(false);
-                        setSelectedLessonId(null);
+                        setSelectedBahagiId(null);
                     }}
                     onSubmit={handleAssessmentSubmit}
-                    classId={selectedClassId || ''}
-                    lessonId={selectedLessonId}
+                    bahagiId={selectedBahagiId}
+                    bahagiTitle={classBahagi.find(b => b.id === selectedBahagiId)?.title || ''}
                 />
             )}
 

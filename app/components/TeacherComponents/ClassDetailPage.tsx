@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { EnhancedBahagiCard } from './EnhancedBahagiCard';
+import { EnhancedBahagiCardV2 } from './EnhancedBahagiCardV2';
 import { CreateYunitForm } from './CreateYunitForm';
 import { CreateAssessmentForm } from './CreateAssessmentForm';
 import { EditBahagiForm } from './EditBahagiForm';
@@ -14,6 +14,7 @@ interface ClassDetailPageProps {
     teacherId?: string;
     onBack: () => void;
     onCreateBahagi: () => void;
+    onRefreshBahagi?: () => void;
     onCreateLesson?: () => void;
     onCreateYunit?: (bahagiId: number) => void;
     onCreateAssessment?: (lessonId: string) => void;
@@ -33,6 +34,7 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
     teacherId,
     onBack,
     onCreateBahagi,
+    onRefreshBahagi,
     onCreateLesson,
     onCreateYunit,
     onCreateAssessment,
@@ -168,22 +170,24 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
     const handleAssessmentSubmit = async (data: any) => {
         setIsCreatingAssessment(true);
         try {
+            console.log('📤 Submitting assessment data:', data);
+            
             const res = await fetch('/api/teacher/manage-assessment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     bahagiId: data.bahagiId,
-                    lessonId: data.lessonId,
                     title: data.title,
-                    type: data.type,
-                    options: data.options,
-                    correctAnswer: data.correctAnswer,
-                    points: data.points
+                    instructions: data.instructions,
+                    questions: data.questions
                 })
             });
 
+            console.log('📨 API Response Status:', res.status);
+
             if (res.ok) {
                 const result = await res.json();
+                console.log('✅ Assessment created:', result);
                 alert('✅ Assessment created successfully!');
                 setShowAssessmentForm(false);
                 // Refresh assessments
@@ -212,23 +216,33 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
     const handleBahagiEditSubmit = async (data: any) => {
         setIsEditingBahagi(true);
         try {
+            console.log('📤 Sending update request with data:', data);
+            
             const res = await fetch('/api/teacher/update-bahagi', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
 
+            console.log('📨 API Response Status:', res.status);
+
             if (res.ok) {
+                const responseData = await res.json();
+                console.log('✅ API Response:', responseData);
                 alert('✅ Bahagi updated successfully!');
                 setShowEditBahagiForm(false);
-                onCreateBahagi();
+                // Refresh the bahagi list after successful edit
+                if (onRefreshBahagi) {
+                    await onRefreshBahagi();
+                }
             } else {
                 const error = await res.json();
-                alert(`❌ Error: ${error.error}`);
+                console.error('❌ API Error:', error);
+                alert(`❌ Error: ${error.error || 'Failed to update bahagi'}`);
             }
         } catch (err) {
             console.error('Error updating bahagi:', err);
-            alert('❌ Failed to update bahagi');
+            alert(`❌ Failed to update bahagi: ${err instanceof Error ? err.message : 'Unknown error'}`);
         } finally {
             setIsEditingBahagi(false);
         }
@@ -418,20 +432,28 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
                 {bahagi.length > 0 ? (
                     <div className="space-y-4">
                         {bahagi.map((b) => (
-                            <EnhancedBahagiCard
-                                key={b.id}
-                                bahagi={b}
-                                isExpanded={expandedBahagiId === b.id}
-                                onToggleExpand={() => handleToggleBahagiExpand(b.id)}
-                                onEdit={() => handleEditBahagi(b.id)}
-                                onArchive={() => handleArchiveBahagi(b.id)}
-                                onDelete={() => handleDeleteBahagi(b.id)}
-                                onTogglePublish={(isPublished) => handleTogglePublish(b.id, isPublished)}
-                                onCreateYunit={() => handleCreateYunit(b)}
-                            >
-                                {/* Yunits Section */}
+                            <div key={b.id}>
+                                <EnhancedBahagiCardV2
+                                    id={b.id}
+                                    title={b.title}
+                                    description={b.description}
+                                    iconPath={b.icon_path}
+                                    iconType={b.icon_type}
+                                    isArchived={b.is_archived}
+                                    lessonCount={bahagiYunits[b.id]?.length || 0}
+                                    assessmentCount={bahagiAssessments[b.id]?.length || 0}
+                                    expanded={expandedBahagiId === b.id}
+                                    onToggleExpand={() => handleToggleBahagiExpand(b.id)}
+                                    onEdit={() => handleEditBahagi(b.id)}
+                                    onArchive={() => handleArchiveBahagi(b.id)}
+                                    onDelete={() => handleDeleteBahagi(b.id)}
+                                    onAddYunit={() => handleCreateYunit(b)}
+                                    userId={teacherId || ''}
+                                />
+                                
+                                {/* Yunits and Assessments Section */}
                                 {expandedBahagiId === b.id && (
-                                    <div className="space-y-4">
+                                    <div className="mt-4 space-y-4 ml-4 pl-4 border-l-2 border-brand-purple/30">
                                         {/* Yunits */}
                                         <div>
                                             <div className="flex items-center justify-between mb-3">
@@ -572,12 +594,12 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
                                                 onClick={() => handleCreateAssessment(b)}
                                                 className="flex-1 text-center text-xs font-black text-brand-sky hover:text-white uppercase tracking-widest px-4 py-2 rounded-lg border border-brand-sky/30 hover:bg-brand-sky/10 transition-all"
                                             >
-                                                + Add Assessment
+                                                + Edit Assessment
                                             </button>
                                         </div>
                                     </div>
                                 )}
-                            </EnhancedBahagiCard>
+                            </div>
                         ))}
                     </div>
                 ) : (
