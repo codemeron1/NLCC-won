@@ -674,8 +674,9 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { apiClient } from '@/lib/api-client';
 
 interface AvatarPart {
     id: string;
@@ -710,6 +711,9 @@ type AvatarItem = AvatarPart & {
 export const StudentAvatarCustomization = () => {
     const [activeCategory, setActiveCategory] =
         useState<keyof AvatarCustomization>('katawan');
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveMessage, setSaveMessage] = useState('');
 
     const [customization, setCustomization] = useState<AvatarCustomization>({
         katawan: {
@@ -761,6 +765,74 @@ export const StudentAvatarCustomization = () => {
             src: '/Character/Avatar/accesories/eg1.png'
         }
     });
+
+    // Load avatar customization on mount
+    useEffect(() => {
+        const loadAvatar = async () => {
+            try {
+                setIsLoading(true);
+                const result = await apiClient.student.getAvatarCustomization();
+                
+                if (result.success && result.data) {
+                    // Parse JSONB fields and update customization
+                    const loadedData: Partial<AvatarCustomization> = {};
+                    
+                    const fields: (keyof AvatarCustomization)[] = [
+                        'katawan', 'hair', 'eyes', 'mouth', 'damit', 'pants', 'shoes', 'accessory'
+                    ];
+                    
+                    fields.forEach(field => {
+                        if (result.data[field]) {
+                            try {
+                                // Parse if it's a string, otherwise use as is
+                                loadedData[field] = typeof result.data[field] === 'string' 
+                                    ? JSON.parse(result.data[field]) 
+                                    : result.data[field];
+                            } catch (e) {
+                                console.error(`Error parsing ${field}:`, e);
+                            }
+                        }
+                    });
+                    
+                    // Merge loaded data with defaults
+                    setCustomization(prev => ({
+                        ...prev,
+                        ...loadedData
+                    }));
+                }
+            } catch (error) {
+                console.error('Error loading avatar:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadAvatar();
+    }, []);
+
+    // Save avatar customization
+    const handleSaveAvatar = async () => {
+        try {
+            setIsSaving(true);
+            setSaveMessage('');
+            
+            const result = await apiClient.student.saveAvatarCustomization(customization);
+            
+            if (result.success) {
+                setSaveMessage('✅ Avatar saved!');
+                setTimeout(() => setSaveMessage(''), 3000);
+            } else {
+                setSaveMessage('❌ Failed to save');
+                setTimeout(() => setSaveMessage(''), 3000);
+            }
+        } catch (error) {
+            console.error('Error saving avatar:', error);
+            setSaveMessage('❌ Error saving');
+            setTimeout(() => setSaveMessage(''), 3000);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     // LAYER ORDER (IMPORTANT)
     const renderOrder: (keyof AvatarCustomization)[] = [
@@ -874,6 +946,22 @@ export const StudentAvatarCustomization = () => {
         }
     });
 
+    // Loading state
+    if (isLoading) {
+        return (
+            <div className="min-h-full p-8 flex items-center justify-center">
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center"
+                >
+                    <div className="text-6xl mb-4">⏳</div>
+                    <p className="text-white text-xl">Loading avatar...</p>
+                </motion.div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-full p-8">
             {/* HEADER */}
@@ -922,9 +1010,24 @@ export const StudentAvatarCustomization = () => {
                         </div>
 
                         {/* SAVE BUTTON */}
-                        <button className="w-full mt-6 px-4 py-3 bg-brand-purple hover:shadow-lg hover:shadow-purple-500/40 text-white rounded-lg font-bold transition-all">
-                            💾 I-save ang Avatar
+                        <button 
+                            onClick={handleSaveAvatar}
+                            disabled={isSaving}
+                            className="w-full mt-6 px-4 py-3 bg-brand-purple hover:shadow-lg hover:shadow-purple-500/40 text-white rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isSaving ? '⏳ Saving...' : '💾 I-save ang Avatar'}
                         </button>
+                        
+                        {/* SAVE MESSAGE */}
+                        {saveMessage && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mt-2 text-center text-sm font-semibold"
+                            >
+                                {saveMessage}
+                            </motion.div>
+                        )}
                     </div>
                 </motion.div>
 
