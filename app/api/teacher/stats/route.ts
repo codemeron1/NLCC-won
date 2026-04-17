@@ -168,11 +168,14 @@ export async function GET(request: Request) {
             stats[3].value = totalLessons.toString();
 
             return NextResponse.json({
-                stats,
-                students: processedStudents,
-                classes,
-                weeklyChart: Array.from({ length: 7 }, (_, i) => ({ label: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i], value: 0 })),
-                monthlyChart: Array.from({ length: 4 }, (_, i) => ({ label: `Week ${i + 1}`, value: 0 })),
+                success: true,
+                data: {
+                    stats,
+                    students: processedStudents,
+                    classes,
+                    weeklyChart: Array.from({ length: 7 }, (_, i) => ({ label: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i], value: 0 })),
+                    monthlyChart: Array.from({ length: 4 }, (_, i) => ({ label: `Week ${i + 1}`, value: 0 })),
+                }
             });
         }
     } catch (dbError) {
@@ -181,21 +184,27 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-        stats,
-        students,
-        classes,
-        weeklyChart: Array.from({ length: 7 }, (_, i) => ({ label: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i], value: 0 })),
-        monthlyChart: Array.from({ length: 4 }, (_, i) => ({ label: `Week ${i + 1}`, value: 0 })),
+        success: true,
+        data: {
+            stats,
+            students,
+            classes,
+            weeklyChart: Array.from({ length: 7 }, (_, i) => ({ label: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i], value: 0 })),
+            monthlyChart: Array.from({ length: 4 }, (_, i) => ({ label: `Week ${i + 1}`, value: 0 })),
+        }
     });
   } catch (error: any) {
     console.error('Teacher Stats API Error:', error);
     return NextResponse.json({ 
-        stats: [],
-        students: [],
-        classes: [],
-        weeklyChart: [],
-        monthlyChart: [],
-        error: 'Failed to fetch stats'
+        success: false,
+        error: 'Failed to fetch stats',
+        data: {
+            stats: [],
+            students: [],
+            classes: [],
+            weeklyChart: [],
+            monthlyChart: [],
+        }
     }, { status: 500 });
   }
 }

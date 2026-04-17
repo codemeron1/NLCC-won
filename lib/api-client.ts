@@ -996,14 +996,14 @@ class TeacherStatsService extends APIClient {
    * Get teacher dashboard stats
    */
   async getStats(teacherId: string): Promise<APIResponse> {
-    return this.get(`/stats?teacher_id=${teacherId}`);
+    return this.get(`/stats?teacherId=${teacherId}`);
   }
 
   /**
    * Get class statistics
    */
   async getClassStats(classId: string): Promise<APIResponse> {
-    return this.get(`/class-stats?class_id=${classId}`);
+    return this.get(`/class-stats?classId=${classId}`);
   }
 
   /**
