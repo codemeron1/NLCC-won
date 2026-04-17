@@ -398,7 +398,10 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
             {/* Sidebar */}
             <TeacherSidebar
                 activeTab={activeTab}
-                onTabChange={(tab: 'overview' | 'classes' | 'profile') => setActiveTab(tab)}
+                onTabChange={(tab: 'overview' | 'classes' | 'profile') => {
+                    setActiveTab(tab);
+                    setSelectedClassId(null); // Clear class detail view when switching tabs
+                }}
                 user={user}
                 isSidebarOpen={isSidebarOpen}
                 onSidebarClose={() => setIsSidebarOpen(false)}
