@@ -201,11 +201,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
         try {
             const response = await apiClient.admin.updateUser(selectedUser.id, {
-                name: `${selectedUser.firstName} ${selectedUser.lastName}`,
+                firstName: selectedUser.firstName,
+                lastName: selectedUser.lastName,
                 email: selectedUser.email,
                 lrn: selectedUser.lrn,
                 role: selectedUser.role,
-                class_name: selectedUser.class_name,
+                className: selectedUser.class_name,
                 teacher_id: selectedUser.teacher_id || null,
                 class_id: selectedUser.class_id || null,
                 teacher_role: selectedUser.teacher_role || null,

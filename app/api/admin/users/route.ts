@@ -47,6 +47,7 @@ export async function GET(request: Request) {
         lrn, 
         role, 
         class_name, 
+        class_id,
         teacher_id,
         teacher_role,
         created_at 
@@ -69,7 +70,10 @@ export async function GET(request: Request) {
       role: u.role,
       className: u.class_name,
       class_name: u.class_name,
+      class_id: u.class_id,
+      classId: u.class_id,
       teacherId: u.teacher_id,
+      teacher_id: u.teacher_id,
       teacher_role: u.teacher_role,
       joinDate: u.created_at ? new Date(u.created_at).toLocaleDateString() : 'Unknown',
       status: 'Active',

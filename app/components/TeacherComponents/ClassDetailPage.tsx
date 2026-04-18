@@ -391,7 +391,7 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
                     onClick={() => setShowStudentsView(!showStudentsView)}
                     className={`${showStudentsView ? 'bg-brand-sky hover:bg-brand-sky/80' : 'bg-slate-800 hover:bg-slate-700'} text-white px-6 py-3 rounded-xl font-black text-sm uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 border ${showStudentsView ? 'border-brand-sky/30' : 'border-slate-700'}`}
                 >
-                    <span>👥</span> Manage Students
+                    <span>👥</span> View Students
                 </button>
                 {!showStudentsView && (
                     <>

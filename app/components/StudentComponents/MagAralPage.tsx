@@ -222,6 +222,8 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
         <BahagiView
           studentId={studentId}
           classId={(selectedBahagiId as string) || selectedClassId || ''}
+          teacherId={teacherInfo?.teacherId || null}
+          className={teacherInfo?.className || null}
           onSelectBahagi={handleSelectBahagi}
           onBack={goBack}
         />
