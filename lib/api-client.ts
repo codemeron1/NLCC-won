@@ -514,7 +514,7 @@ class AvatarAPI extends APIClient {
    * Get student avatar
    */
   async getAvatar(studentId: string): Promise<APIResponse> {
-    return this.get(`/avatar?student_id=${studentId}`);
+    return this.get(`/avatar?studentId=${studentId}`);
   }
 
   /**
@@ -522,7 +522,7 @@ class AvatarAPI extends APIClient {
    */
   async updateAvatar(studentId: string, data: any): Promise<APIResponse> {
     return this.patch(`/avatars/${studentId}`, {
-      student_id: studentId,
+      studentId: studentId,
       ...data
     });
   }
@@ -531,7 +531,7 @@ class AvatarAPI extends APIClient {
    * Get avatar items/customizations
    */
   async getItems(studentId: string): Promise<APIResponse> {
-    return this.get(`/avatar-items?student_id=${studentId}`);
+    return this.get(`/avatar-items?studentId=${studentId}`);
   }
 
   /**
@@ -539,8 +539,8 @@ class AvatarAPI extends APIClient {
    */
   async purchaseItem(studentId: string, itemId: string): Promise<APIResponse> {
     return this.post(`/avatar-items`, {
-      student_id: studentId,
-      item_id: itemId
+      studentId: studentId,
+      itemId: itemId
     });
   }
 }
