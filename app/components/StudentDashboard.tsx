@@ -24,7 +24,18 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     user,
     onStartLesson
 }) => {
-    const [activeTab, setActiveTab] = useState<TabType>('lessons');
+    // Initialize activeTab from localStorage
+    const getInitialTab = (): TabType => {
+        if (typeof window !== 'undefined') {
+            const savedTab = localStorage.getItem('studentActiveTab');
+            if (savedTab && ['lessons', 'leaders', 'missions', 'store', 'avatar', 'profile'].includes(savedTab)) {
+                return savedTab as TabType;
+            }
+        }
+        return 'lessons';
+    };
+
+    const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const [userProfile, setUserProfile] = useState<any>(null);
     const [currentPassword, setCurrentPassword] = useState('');
@@ -35,6 +46,19 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const avatarRef = useRef<HTMLDivElement>(null);
+
+    // Profile edit states
+    const [editFirstName, setEditFirstName] = useState('');
+    const [editLastName, setEditLastName] = useState('');
+    const [editEmail, setEditEmail] = useState('');
+    const [profileError, setProfileError] = useState('');
+    const [profileSuccess, setProfileSuccess] = useState('');
+    const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+
+    // Save active tab to localStorage when it changes
+    useEffect(() => {
+        localStorage.setItem('studentActiveTab', activeTab);
+    }, [activeTab]);
 
     const tabs = [
         { id: 'lessons' as const, label: 'Mag-Aral', icon: '📚' },
@@ -54,6 +78,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                     if (response.ok) {
                         const data = await response.json();
                         setUserProfile(data);
+                        setEditFirstName(data.firstName || '');
+                        setEditLastName(data.lastName || '');
+                        setEditEmail(data.email || '');
                     }
                 } catch (error) {
                     console.error('Error fetching user profile:', error);
@@ -120,6 +147,51 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             link.click();
         } catch (error) {
             console.error('Error downloading avatar:', error);
+        }
+    };
+
+    // Handle profile update
+    const handleProfileUpdate = async () => {
+        setProfileError('');
+        setProfileSuccess('');
+
+        if (!editFirstName.trim() || !editLastName.trim()) {
+            setProfileError('Pangalan ay kinakailangan');
+            return;
+        }
+
+        if (!editEmail.trim() || !editEmail.includes('@')) {
+            setProfileError('Valid email ay kinakailangan');
+            return;
+        }
+
+        setIsLoadingProfile(true);
+
+        try {
+            const response = await fetch('/api/user/update-profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user?.id,
+                    firstName: editFirstName.trim(),
+                    lastName: editLastName.trim(),
+                    email: editEmail.trim()
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setProfileSuccess('Matagumpay na na-update ang profile!');
+                setUserProfile(data.user);
+                setTimeout(() => setProfileSuccess(''), 3000);
+            } else {
+                setProfileError(data.error || 'Hindi ma-update ang profile');
+            }
+        } catch (error) {
+            setProfileError('May error sa pag-update ng profile');
+        } finally {
+            setIsLoadingProfile(false);
         }
     };
 
@@ -228,34 +300,71 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl items-stretch">
                                 {/* Left Side - Profile Information */}
                                 <div className="space-y-6 flex flex-col">
-                                    <div>
-                                        <label className="block text-sm font-semibold text-slate-300 mb-2">Pangalan</label>
-                                        <input
-                                            type="text"
-                                            value={`${user?.firstName || ''} ${user?.lastName || ''}`}
-                                            readOnly
-                                            className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-lg text-white font-medium focus:outline-none focus:ring-2 focus:ring-brand-purple/50"
-                                        />
-                                    </div>
+                                    <div className="space-y-4">
+                                        <h3 className="text-lg font-bold text-white mb-4">Personal na Impormasyon</h3>
+                                        
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-300 mb-2">Unang Pangalan</label>
+                                            <input
+                                                type="text"
+                                                value={editFirstName}
+                                                onChange={(e) => setEditFirstName(e.target.value)}
+                                                className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-lg text-white font-medium focus:outline-none focus:ring-2 focus:ring-brand-purple/50"
+                                                placeholder="Ilagay ang unang pangalan"
+                                            />
+                                        </div>
 
-                                    <div>
-                                        <label className="block text-sm font-semibold text-slate-300 mb-2">LRN Number</label>
-                                        <input
-                                            type="text"
-                                            value={userProfile?.lrn || 'N/A'}
-                                            readOnly
-                                            className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-lg text-white font-medium focus:outline-none focus:ring-2 focus:ring-brand-purple/50"
-                                        />
-                                    </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-300 mb-2">Apelyido</label>
+                                            <input
+                                                type="text"
+                                                value={editLastName}
+                                                onChange={(e) => setEditLastName(e.target.value)}
+                                                className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-lg text-white font-medium focus:outline-none focus:ring-2 focus:ring-brand-purple/50"
+                                                placeholder="Ilagay ang apelyido"
+                                            />
+                                        </div>
 
-                                    <div>
-                                        <label className="block text-sm font-semibold text-slate-300 mb-2">Email</label>
-                                        <input
-                                            type="email"
-                                            value={userProfile?.email || user?.email || 'N/A'}
-                                            readOnly
-                                            className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-lg text-white font-medium focus:outline-none focus:ring-2 focus:ring-brand-purple/50"
-                                        />
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-300 mb-2">LRN Number</label>
+                                            <input
+                                                type="text"
+                                                value={userProfile?.lrn || 'N/A'}
+                                                readOnly
+                                                className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-lg text-slate-400 font-medium cursor-not-allowed"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-300 mb-2">Email</label>
+                                            <input
+                                                type="email"
+                                                value={editEmail}
+                                                onChange={(e) => setEditEmail(e.target.value)}
+                                                className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-lg text-white font-medium focus:outline-none focus:ring-2 focus:ring-brand-purple/50"
+                                                placeholder="Ilagay ang email"
+                                            />
+                                        </div>
+
+                                        {profileError && (
+                                            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                                                {profileError}
+                                            </div>
+                                        )}
+
+                                        {profileSuccess && (
+                                            <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400 text-sm">
+                                                {profileSuccess}
+                                            </div>
+                                        )}
+
+                                        <button
+                                            onClick={handleProfileUpdate}
+                                            disabled={isLoadingProfile}
+                                            className="w-full px-6 py-3 bg-linear-to-r from-brand-purple to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-slate-700 disabled:to-slate-700 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all"
+                                        >
+                                            {isLoadingProfile ? 'Sinasave...' : 'I-save ang mga Pagbabago'}
+                                        </button>
                                     </div>
 
                                     <div className="pt-4 border-t border-white/10">
