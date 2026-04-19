@@ -999,7 +999,6 @@ export const StudentAvatarCustomization = () => {
                             </motion.div>
                         )}
                     </div>
-                </motion.div>
 
                 {/* OPTIONS */}
                 <div className="lg:col-span-2">
