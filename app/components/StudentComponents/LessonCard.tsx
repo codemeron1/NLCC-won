@@ -11,6 +11,8 @@ interface LessonCardProps {
   imageUrl?: string;
   passedYunits: number;
   totalYunits: number;
+  completedAssessments?: number;
+  totalAssessments?: number;
   isCompleted: boolean;
   isUnlocked: boolean;
   xpReward: number;
@@ -29,6 +31,8 @@ const LessonCardComponent: React.FC<LessonCardProps> = ({
   imageUrl,
   passedYunits,
   totalYunits,
+  completedAssessments = 0,
+  totalAssessments = 0,
   isCompleted,
   isUnlocked,
   xpReward,
@@ -38,7 +42,9 @@ const LessonCardComponent: React.FC<LessonCardProps> = ({
   onStart,
   onMatuto,
 }) => {
-  const progressPercentage = totalYunits > 0 ? Math.round((passedYunits / totalYunits) * 100) : 0;
+  const totalItems = totalYunits + totalAssessments;
+  const completedItems = passedYunits + completedAssessments;
+  const progressPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
   const displayPercentage = passedYunits > 0 && progressPercentage < 5 ? 5 : progressPercentage;
 
   return (
@@ -98,12 +104,12 @@ const LessonCardComponent: React.FC<LessonCardProps> = ({
           <div className="flex items-center gap-3 mb-4">
             <div className="relative w-full h-2.5 bg-slate-700 rounded-full overflow-hidden">
               <motion.div
-                key={`progress-${passedYunits}-${totalYunits}`}
+                key={`progress-${completedItems}-${totalItems}`}
                 initial={{ width: 0 }}
                 animate={{ width: `${displayPercentage}%` }}
                 transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
                 className="h-full bg-purple-500 rounded-full"
-                style={{ minWidth: passedYunits > 0 ? '5%' : '0%' }}
+                style={{ minWidth: completedItems > 0 ? '5%' : '0%' }}
               />
               <motion.div
                 initial={{ left: 0 }}
@@ -119,7 +125,7 @@ const LessonCardComponent: React.FC<LessonCardProps> = ({
 
           <div className="flex items-center justify-between mb-6 gap-3">
             <p className="text-xs text-slate-400">
-              {passedYunits} / {totalYunits} na-tapos · {yunitCount} yunit
+              {passedYunits} / {totalYunits} yunit{totalAssessments > 0 ? ` · ${completedAssessments} / ${totalAssessments} assessment` : ''}
             </p>
             <span className="text-sm font-black text-amber-400 whitespace-nowrap">
               ⚡ +{xpReward * totalYunits} XP

@@ -28,6 +28,8 @@ interface Lesson {
   yunits: any[];
   passedYunits: number;
   totalYunits: number;
+  completedAssessments?: number;
+  totalAssessments?: number;
   isCompleted: boolean;
   isUnlocked: boolean;
   xpReward: number;
@@ -312,6 +314,8 @@ const TeacherLessonsViewComponent: React.FC<TeacherLessonsViewProps> = ({
                   imageUrl={lesson.imageUrl}
                   passedYunits={lesson.passedYunits}
                   totalYunits={lesson.totalYunits}
+                  completedAssessments={lesson.completedAssessments || 0}
+                  totalAssessments={lesson.totalAssessments || 0}
                   isCompleted={lesson.isCompleted}
                   isUnlocked={lesson.isUnlocked}
                   xpReward={lesson.xpReward}

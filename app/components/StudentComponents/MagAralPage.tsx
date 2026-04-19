@@ -271,22 +271,21 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
 
   const handleCloseReward = () => {
     setShowRewardModal(false);
-    if (rewardData?.success && rewardData?.progress?.is_passed) {
-      // Refresh YunitView to show updated progress
-      setYunitViewKey(prev => prev + 1);
-      
-      // Invalidate yunits cache for this specific lesson to fetch fresh data
-      if (selectedBahagiId) {
-        setYunitsCache(prev => {
-          const newCache = { ...prev };
-          delete newCache[selectedBahagiId.toString()];
-          return newCache;
-        });
-      }
-      
-      // Go back to yunits view after successful completion
-      setCurrentView('yunits');
+    
+    // Refresh YunitView to show updated progress
+    setYunitViewKey(prev => prev + 1);
+    
+    // Invalidate yunits cache for this specific bahagi to fetch fresh data
+    if (selectedBahagiId) {
+      setYunitsCache(prev => {
+        const newCache = { ...prev };
+        delete newCache[selectedBahagiId.toString()];
+        return newCache;
+      });
     }
+    
+    // Go back to yunits view after assessment
+    setCurrentView('yunits');
   };
 
   const goBack = () => {

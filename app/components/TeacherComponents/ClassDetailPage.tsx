@@ -330,6 +330,8 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
                 }
 
                 fetchAssessmentsForBahagi(data.bahagiId);
+                // Refresh bahagi list to update assessment counts
+                onRefreshBahagi?.();
             } else {
                 alert(`❌ Error: ${response.error}`);
             }
@@ -928,7 +930,7 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
                                     </h3>
                                     <div className="h-[2px] flex-1 bg-gradient-to-r from-brand-purple/50 to-transparent"></div>
                                     <span className="text-xs font-black text-slate-500 bg-slate-900 px-3 py-1 rounded">
-                                        {bahagiByQuarter[quarter].length} {bahagiByQuarter[quarter].length === 1 ? 'lesson' : 'lessons'}
+                                        {bahagiByQuarter[quarter].length} {bahagiByQuarter[quarter].length === 1 ? 'bahagi' : 'bahagi'}
                                     </span>
                                     <div className="text-2xl text-slate-500 group-hover:text-brand-purple transition-colors">
                                         {collapsedQuarters.has(quarter) ? '▶' : '▼'}
@@ -1122,22 +1124,6 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
                                             ) : (
                                                 <p className="text-xs text-slate-600 italic">No assessments yet</p>
                                             )}
-                                        </div>
-
-                                        {/* Add Yunit/Assessment Buttons */}
-                                        <div className="border-t border-slate-700/50 pt-4 flex gap-2">
-                                            <button
-                                                onClick={() => handleCreateYunit(b)}
-                                                className="flex-1 text-center text-xs font-black text-brand-sky hover:text-white uppercase tracking-widest px-4 py-2 rounded-lg border border-brand-sky/30 hover:bg-brand-sky/10 transition-all"
-                                            >
-                                                + Add Yunit
-                                            </button>
-                                            <button
-                                                onClick={() => handleCreateAssessment(b)}
-                                                className="flex-1 text-center text-xs font-black text-brand-sky hover:text-white uppercase tracking-widest px-4 py-2 rounded-lg border border-brand-sky/30 hover:bg-brand-sky/10 transition-all"
-                                            >
-                                                + Edit Assessment
-                                            </button>
                                         </div>
                                     </div>
                                 )}

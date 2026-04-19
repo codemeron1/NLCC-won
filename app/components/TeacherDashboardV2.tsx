@@ -369,14 +369,14 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
 
             console.log('[handleBahagiSubmit] Response:', response);
 
-            if (response.success && response.data) {
+            if (response.bahagi || response.success || response.data) {
                 setShowBahagiForm(false);
                 // Refresh bahagi list to show the newly created one
                 await handleRefreshBahagi();
                 alert('✅ Bahagi created successfully!');
             } else {
                 console.error('[handleBahagiSubmit] Unexpected response:', response);
-                alert(`❌ Error: Failed to create bahagi`);
+                alert(`❌ Error: ${response.error || 'Failed to create bahagi'}`);
             }
         } catch (err: any) {
             console.error('[handleBahagiSubmit] Exception:', err);
@@ -488,18 +488,28 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
     // Handle assessment form submission
     const handleAssessmentSubmit = async (data: any) => {
         try {
+            const totalPoints = data.questions?.reduce((sum: number, q: any) => {
+                return sum + (parseInt(q.xp) || 0);
+            }, 0) || 0;
+
+            const assessmentType = data.questions?.[0]?.type || data.type || 'multiple-choice';
+
             const response = await apiClient.assessment.create({
-                ...data,
-                yunit_id: 0,
-                bahagi_id: 0,
+                yunit_id: data.lessonId || 0,
+                bahagi_id: data.bahagiId || selectedBahagiId || 0,
+                title: data.title,
+                description: data.instructions,
+                assessment_type: assessmentType,
+                points: totalPoints,
+                questions: data.questions,
+                total_questions: data.questions?.length || 0,
                 teacher_id: user?.id
             });
 
             if (response.success) {
                 alert('✅ Assessment created successfully!');
                 setShowAssessmentForm(false);
-                // Refresh lessons
-                // TODO: Refresh class lessons
+                await handleRefreshBahagi();
             } else {
                 alert(`❌ Error: ${response.error}`);
             }
