@@ -5,11 +5,12 @@ import { apiClient } from '@/lib/api-client';
 import { ClassView } from './ClassView';
 import { BahagiView } from './BahagiView';
 import { YunitView } from './YunitView';
+import { LessonContentView } from './LessonContentView';
 import { AssessmentScreen } from './AssessmentScreen';
 import { RewardModal } from './RewardModal';
 import { TeacherLessonsView } from './TeacherLessonsView';
 
-type ViewType = 'lessons' | 'classes' | 'bahagis' | 'yunits' | 'assessment';
+type ViewType = 'lessons' | 'classes' | 'bahagis' | 'yunits' | 'lessonContent' | 'assessment';
 
 interface MagAralPageProps {
   studentId: string;
@@ -34,7 +35,7 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
   const getInitialView = (): ViewType => {
     if (typeof window !== 'undefined') {
       const savedView = localStorage.getItem('magAralView');
-      if (savedView && ['lessons', 'classes', 'bahagis', 'yunits', 'assessment'].includes(savedView)) {
+      if (savedView && ['lessons', 'classes', 'bahagis', 'yunits', 'lessonContent', 'assessment'].includes(savedView)) {
         return savedView as ViewType;
       }
     }
@@ -65,19 +66,29 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
   const [currentView, setCurrentView] = useState<ViewType>(getInitialView);
   const [teacherInfo, setTeacherInfo] = useState<TeacherInfo | null>(null);
   const [isLoadingTeacher, setIsLoadingTeacher] = useState(true);
+  const [yunitViewKey, setYunitViewKey] = useState(0); // For forcing YunitView refresh
+  const [lessonsViewKey, setLessonsViewKey] = useState(0); // For forcing TeacherLessonsView refresh
+
+  // Reset to classes view on first mount (ensure clean state)
+  useEffect(() => {
+    setCurrentView('classes');
+    localStorage.removeItem('magAralBahagiId'); // Clear old bahagi selection
+  }, []); // Run only once on mount
 
   // Fetch student's teacher info on component mount
   useEffect(() => {
     const fetchTeacherInfo = async () => {
       try {
+        console.log('🔍 [MagAralPage] Fetching teacher info for student:', studentId);
         const res = await apiClient.student.getDetails(studentId);
+        console.log('🔍 [MagAralPage] Teacher info response:', res);
+        
         if (res.success) {
+          console.log('🔍 [MagAralPage] Teacher info data:', res.data);
           setTeacherInfo(res.data);
-          // Only set to lessons if no saved view and student has a teacher assigned
-          const savedView = localStorage.getItem('magAralView');
-          if (!savedView && res.data?.isAssigned) {
-            setCurrentView('lessons');
-          }
+          // Always start with classes view - let user choose which class
+        } else {
+          console.error('🔍 [MagAralPage] Failed to get teacher info:', res.error);
         }
       } catch (err) {
         console.error('Failed to fetch teacher info:', err);
@@ -130,12 +141,12 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
 
   const handleSelectClass = (classId: string) => {
     setSelectedClassId(classId);
-    setCurrentView('bahagis');
+    setCurrentView('lessons');
   };
 
   const handleSelectLesson = (bahagiId: string) => {
     setSelectedBahagiId(bahagiId);
-    setCurrentView('bahagis');
+    setCurrentView('yunits');
   };
 
   const handleSelectBahagi = (bahagiId: string | number) => {
@@ -145,7 +156,17 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
 
   const handleStartAssessment = (yunitId: string | number) => {
     setSelectedYunitId(yunitId);
+    setCurrentView('lessonContent');
+  };
+
+  const handleLessonComplete = () => {
+    // Move from lesson content to assessment (called after last yunit)
     setCurrentView('assessment');
+  };
+
+  const handleNextYunit = (yunitId: string | number) => {
+    // Navigate to next yunit in the sequence
+    setSelectedYunitId(yunitId);
   };
 
   const handleAssessmentComplete = (result: any) => {
@@ -156,6 +177,8 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
   const handleCloseReward = () => {
     setShowRewardModal(false);
     if (rewardData?.success && rewardData?.progress?.is_passed) {
+      // Refresh YunitView when returning after assessment completion
+      setYunitViewKey(prev => prev + 1);
       // Go back to yunits view after successful completion
       setCurrentView('yunits');
     }
@@ -163,21 +186,19 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
 
   const goBack = () => {
     if (currentView === 'lessons') {
-      setCurrentView('lessons');
-    } else if (currentView === 'bahagis') {
-      if (teacherInfo?.isAssigned) {
-        setCurrentView('lessons');
-        setSelectedClassId(null);
-      } else {
-        setCurrentView('classes');
-        setSelectedClassId(null);
-      }
+      setCurrentView('classes');
+      setSelectedClassId(null);
     } else if (currentView === 'yunits') {
-      setCurrentView('bahagis');
+      // Refresh TeacherLessonsView when going back from yunits
+      setLessonsViewKey(prev => prev + 1);
+      setCurrentView('lessons');
       setSelectedBahagiId(null);
-    } else if (currentView === 'assessment') {
+    } else if (currentView === 'lessonContent') {
+      // Refresh YunitView when going back from lesson content
+      setYunitViewKey(prev => prev + 1);
       setCurrentView('yunits');
-      setSelectedYunitId(null);
+    } else if (currentView === 'assessment') {
+      setCurrentView('lessonContent');
     }
   };
 
@@ -198,14 +219,30 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
       {/* Teacher Lessons View - shown when student has a teacher assigned */}
       {currentView === 'lessons' && teacherInfo?.isAssigned && teacherInfo?.teacherId && (
         <TeacherLessonsView
+          key={lessonsViewKey}
           studentId={studentId}
           studentName={studentName}
           teacherId={teacherInfo.teacherId}
           teacherName={teacherInfo.teacherName || 'Your Teacher'}
           className={teacherInfo.className || 'Your Class'}
           onSelectLesson={handleSelectLesson}
-          onBack={() => onNavigate?.('dashboard')}
+          onBack={() => setCurrentView('classes')}
         />
+      )}
+
+      {/* Debug info - remove later */}
+      {currentView === 'lessons' && !teacherInfo?.isAssigned && (
+        <div className="p-8 text-center">
+          <p className="text-red-400">No teacher assigned to this student</p>
+          <p className="text-slate-400 mt-2">Teacher Info: {JSON.stringify(teacherInfo)}</p>
+        </div>
+      )}
+
+      {currentView === 'lessons' && teacherInfo?.isAssigned && !teacherInfo?.teacherId && (
+        <div className="p-8 text-center">
+          <p className="text-red-400">Teacher ID missing</p>
+          <p className="text-slate-400 mt-2">Teacher Info: {JSON.stringify(teacherInfo)}</p>
+        </div>
       )}
 
       {/* Class View - fallback for students without teacher assignment */}
@@ -218,22 +255,25 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
         />
       )}
 
-      {currentView === 'bahagis' && (selectedClassId || selectedBahagiId) && (
-        <BahagiView
+      {/* Removed BahagiView - it's a duplicate of TeacherLessonsView */}
+      
+      {currentView === 'yunits' && selectedBahagiId && (
+        <YunitView
+          key={yunitViewKey}
           studentId={studentId}
-          classId={(selectedBahagiId as string) || selectedClassId || ''}
-          teacherId={teacherInfo?.teacherId || null}
-          className={teacherInfo?.className || null}
-          onSelectBahagi={handleSelectBahagi}
+          bahagiId={selectedBahagiId}
+          onStartAssessment={handleStartAssessment}
           onBack={goBack}
         />
       )}
 
-      {currentView === 'yunits' && selectedBahagiId && (
-        <YunitView
-          studentId={studentId}
+      {currentView === 'lessonContent' && selectedYunitId && selectedBahagiId && (
+        <LessonContentView
+          yunitId={selectedYunitId}
           bahagiId={selectedBahagiId}
-          onStartAssessment={handleStartAssessment}
+          studentId={studentId}
+          onComplete={handleLessonComplete}
+          onNextYunit={handleNextYunit}
           onBack={goBack}
         />
       )}

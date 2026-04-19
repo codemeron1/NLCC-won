@@ -57,6 +57,7 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
     });
     const [classBahagi, setClassBahagi] = useState<any[]>([]);
     const [classLessons, setClassLessons] = useState<any[]>([]);
+    const [isLoadingBahagi, setIsLoadingBahagi] = useState(false);
 
     // Form states
     const [showBahagiForm, setShowBahagiForm] = useState(false);
@@ -127,6 +128,7 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
             // 4. Bahagi haven't been loaded yet (to avoid re-fetching)
             if (selectedClassId && selectedClassName && activeTab === 'classes' && classes.length > 0 && classBahagi.length === 0) {
                 console.log('[RESTORE] Restoring class view for:', selectedClassName);
+                setIsLoadingBahagi(true);
                 try {
                     // Fetch bahagi for the restored class
                     const bahagiResult = await apiClient.bahagi.fetchAll(user?.id, selectedClassName);
@@ -139,6 +141,8 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
                     }
                 } catch (err) {
                     console.error('[RESTORE] Error fetching class data:', err);
+                } finally {
+                    setIsLoadingBahagi(false);
                 }
             }
         };
@@ -178,6 +182,7 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
             sessionStorage.setItem('teacher_selected_class_id', classId);
             sessionStorage.setItem('teacher_selected_class_name', selectedClass.name);
             // Load Bahagi for this class
+            setIsLoadingBahagi(true);
             try {
                 console.log('[handleOpenClass] Fetching bahagi for:', {
                     teacherId: user?.id,
@@ -204,6 +209,8 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
                 console.error('Error fetching class data:', err);
                 setClassBahagi([]);
                 setClassLessons([]);
+            } finally {
+                setIsLoadingBahagi(false);
             }
         }
     };
@@ -305,24 +312,37 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
     const handleRefreshBahagi = async () => {
         if (!selectedClassId || !selectedClassName) return;
         console.log('[REFRESH BAHAGI] Starting refresh for class:', selectedClassName);
+        console.log('[REFRESH BAHAGI] Timestamp:', new Date().toISOString());
+        setIsLoadingBahagi(true);
         try {
             const bahagiResult = await apiClient.bahagi.fetchAll(user?.id, selectedClassName);
             
             console.log('[REFRESH BAHAGI] Full response:', bahagiResult);
+            console.log('[REFRESH BAHAGI] Response timestamp:', new Date().toISOString());
             
             if (bahagiResult?.success) {
                 const newBahagi = bahagiResult.data || [];
                 console.log('[REFRESH BAHAGI] Fetched bahagi count:', newBahagi.length);
-                console.log('[REFRESH BAHAGI] Bahagi data:', newBahagi);
+                console.log('[REFRESH BAHAGI] Bahagi data:', JSON.stringify(newBahagi, null, 2));
+                console.log('[REFRESH BAHAGI] Current classBahagi before update:', classBahagi.length);
                 
                 // Force new array reference to trigger re-render
                 setClassBahagi([...newBahagi]);
+                
+                // Verify state update happened
+                setTimeout(() => {
+                    console.log('[REFRESH BAHAGI] State updated, should trigger re-render');
+                }, 100);
+                
                 console.log('✅ Bahagi list refreshed successfully');
             } else {
                 console.error('[REFRESH BAHAGI] Failed:', bahagiResult?.error);
             }
         } catch (err) {
             console.error('[REFRESH BAHAGI] Error:', err);
+            console.error('[REFRESH BAHAGI] Error timestamp:', new Date().toISOString());
+        } finally {
+            setIsLoadingBahagi(false);
         }
     };
 
@@ -343,10 +363,12 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
             console.log('[handleBahagiSubmit] Response:', response);
 
             if (response && response.bahagi) {
-                alert('✅ Bahagi created successfully!');
                 setShowBahagiForm(false);
-                // Refresh bahagi list to get accurate counts
+                // Small delay to ensure database commit
+                await new Promise(resolve => setTimeout(resolve, 500));
+                // Refresh bahagi list to show the newly created one
                 await handleRefreshBahagi();
+                alert('✅ Bahagi created successfully!');
             } else {
                 console.error('[handleBahagiSubmit] Unexpected response:', response);
                 alert(`❌ Error: Failed to create bahagi`);
@@ -399,22 +421,42 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
     // Handle yunit form submission
     const handleYunitSubmit = async (data: any) => {
         try {
-            const response = await apiClient.yunit.create({
-                ...data,
-                teacher_id: user?.id
+            console.log('[handleYunitSubmit] Creating yunit with data:', data);
+            
+            // Call the bahagi lessons endpoint
+            const response = await fetch(`/api/teacher/bahagi/${data.bahagiId}/lessons`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    title: data.title,
+                    subtitle: data.subtitle || data.description,
+                    discussion: data.discussion,
+                    media_url: data.media_url,
+                    audio_url: data.audio_url,
+                    lesson_order: data.lesson_order
+                })
             });
 
-            if (response.success) {
-                alert('✅ Yunit created successfully!');
+            const result = await response.json();
+            
+            console.log('[handleYunitSubmit] Response:', result);
+
+            if (response.ok && result.lesson) {
                 setShowYunitForm(false);
-                // Refresh lessons
-                // TODO: Refresh class lessons
+                setSelectedBahagiId(null);
+                // Small delay to ensure database commit
+                await new Promise(resolve => setTimeout(resolve, 500));
+                // Refresh bahagi list to show the new yunit count
+                await handleRefreshBahagi();
+                alert('✅ Yunit created successfully!');
             } else {
-                alert(`❌ Error: ${response.error}`);
+                alert(`❌ Error: ${result.error || 'Failed to create yunit'}`);
             }
-        } catch (err) {
-            console.error('Error creating yunit:', err);
-            alert('❌ Failed to create yunit');
+        } catch (err: any) {
+            console.error('[handleYunitSubmit] Exception:', err);
+            alert(`❌ Failed to create yunit: ${err.message || 'Unknown error'}`);
         }
     };
 
@@ -610,6 +652,7 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
                             bahagi={classBahagi}
                             lessons={classLessons}
                             onDeleteLesson={handleDeleteLesson}
+                            isLoadingBahagi={isLoadingBahagi}
                         />
                     ) : (
                         <>

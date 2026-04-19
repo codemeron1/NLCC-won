@@ -38,7 +38,21 @@ export const LessonCard: React.FC<LessonCardProps> = ({
     advanced: 'from-rose-500 to-red-500'
   };
 
+  // Calculate progress percentage
   const progressPercentage = totalYunits > 0 ? (passedYunits / totalYunits) * 100 : 0;
+  
+  // Ensure minimum visible width if there's any progress
+  const displayPercentage = passedYunits > 0 && progressPercentage < 5 ? 5 : progressPercentage;
+  
+  // Log progress for debugging
+  console.log(`[LessonCard] ${title}:`, {
+    passedYunits,
+    totalYunits,
+    progressPercentage: `${progressPercentage}%`,
+    displayPercentage: `${displayPercentage}%`,
+    isCompleted,
+    isUnlocked
+  });
 
   return (
     <motion.div
@@ -66,10 +80,15 @@ export const LessonCard: React.FC<LessonCardProps> = ({
         <div className="flex items-start justify-between mb-4">
           <div>
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">
-              Bahagi {bahagiNumber}, Yunit 1
+              {title}
             </h3>
             <p className="text-sm text-slate-500">
               {passedYunits} of {totalYunits} units completed
+              {totalYunits > 0 && (
+                <span className="ml-2 text-xs font-bold text-brand-purple">
+                  ({Math.round(progressPercentage)}%)
+                </span>
+              )}
             </p>
           </div>
           <button
@@ -97,26 +116,26 @@ export const LessonCard: React.FC<LessonCardProps> = ({
           )}
         </div>
 
-        {/* Title */}
-        <h2 className="text-lg font-black text-white mb-2 line-clamp-2 group-hover:text-brand-purple transition-colors">
-          {title}
-        </h2>
-
         {/* Description */}
         {description && (
-          <p className="text-sm text-slate-400 mb-4 line-clamp-2">
+          <p className="text-sm text-slate-400 mb-4 line-clamp-3">
             {description}
           </p>
         )}
 
         {/* Progress Bar */}
         <div className="mb-4">
-          <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
+          <div className="w-full h-3 bg-slate-700/50 rounded-full overflow-hidden border border-slate-600/50 shadow-inner">
             <motion.div
+              key={`progress-${passedYunits}-${totalYunits}`}
               initial={{ width: 0 }}
-              animate={{ width: `${progressPercentage}%` }}
-              transition={{ duration: 0.6, ease: 'easeOut' }}
-              className={`h-full bg-gradient-to-r ${difficultyColors[difficulty]}`}
+              animate={{ width: `${displayPercentage}%` }}
+              transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
+              className={`h-full bg-gradient-to-r ${difficultyColors[difficulty]} shadow-lg`}
+              style={{
+                boxShadow: passedYunits > 0 ? `0 0 10px rgba(139, 92, 246, 0.5)` : 'none',
+                minWidth: passedYunits > 0 ? '5%' : '0%'
+              }}
             />
           </div>
         </div>
