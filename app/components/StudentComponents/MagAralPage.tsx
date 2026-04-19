@@ -7,10 +7,11 @@ import { BahagiView } from './BahagiView';
 import { YunitView } from './YunitView';
 import { LessonContentView } from './LessonContentView';
 import { AssessmentScreen } from './AssessmentScreen';
+import { AdaptiveQuizScreen } from './AdaptiveQuizScreen';
 import { RewardModal } from './RewardModal';
 import { TeacherLessonsView } from './TeacherLessonsView';
 
-type ViewType = 'lessons' | 'classes' | 'bahagis' | 'yunits' | 'lessonContent' | 'assessment';
+type ViewType = 'lessons' | 'classes' | 'bahagis' | 'yunits' | 'lessonContent' | 'assessment' | 'adaptiveQuiz';
 
 interface MagAralPageProps {
   studentId: string;
@@ -186,6 +187,11 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
     setCurrentView('lessonContent');
   };
 
+  const handleStartQuiz = (bahagiId: string) => {
+    setSelectedBahagiId(bahagiId);
+    setCurrentView('adaptiveQuiz');
+  };
+
   const handleLessonComplete = () => {
     // Move from lesson content to assessment (called after last yunit)
     setCurrentView('assessment');
@@ -244,6 +250,9 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
       setCurrentView('yunits');
     } else if (currentView === 'assessment') {
       setCurrentView('lessonContent');
+    } else if (currentView === 'adaptiveQuiz') {
+      setCurrentView('lessons');
+      setSelectedBahagiId(null);
     }
   };
 
@@ -279,6 +288,7 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
             }));
           }}
           onSelectLesson={handleSelectLesson}
+          onStartQuiz={handleStartQuiz}
           onBack={() => setCurrentView('classes')}
         />
       )}
@@ -338,6 +348,15 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
         <AssessmentScreen
           studentId={studentId}
           yunitId={selectedYunitId}
+          bahagiId={selectedBahagiId}
+          onComplete={handleAssessmentComplete}
+          onBack={goBack}
+        />
+      )}
+
+      {currentView === 'adaptiveQuiz' && selectedBahagiId && (
+        <AdaptiveQuizScreen
+          studentId={studentId}
           bahagiId={selectedBahagiId}
           onComplete={handleAssessmentComplete}
           onBack={goBack}

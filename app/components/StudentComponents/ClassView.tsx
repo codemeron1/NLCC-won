@@ -132,7 +132,7 @@ const ClassViewComponent: React.FC<ClassViewProps> = ({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
               onClick={() => onSelectClass(cls.id, cls.teacherId, cls.name, cls.teacher)}
-              className="text-left p-6 bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-xl hover:border-brand-purple hover:from-slate-700 hover:to-slate-800 transition-all group cursor-pointer"
+              className="text-left p-6 bg-linear-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-xl hover:border-brand-purple hover:from-slate-700 hover:to-slate-800 transition-all group cursor-pointer"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
