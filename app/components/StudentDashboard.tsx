@@ -66,6 +66,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     const [profileSuccess, setProfileSuccess] = useState('');
     const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
+    // Badges state
+    const [completedMissions, setCompletedMissions] = useState<any[]>([]);
+    const [trophies, setTrophies] = useState<any[]>([]);
+    const [badgesLoaded, setBadgesLoaded] = useState(false);
+
     // Save active tab to localStorage when it changes
     useEffect(() => {
         localStorage.setItem('studentActiveTab', activeTab);
@@ -107,6 +112,33 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         };
         fetchUserProfile();
     }, [user?.email]);
+
+    // Fetch badges (completed missions + trophies) when profile tab is visited
+    useEffect(() => {
+        if (activeTab !== 'profile' || badgesLoaded || !user?.id) return;
+        const fetchBadges = async () => {
+            try {
+                const [missionsRes, rewardsRes] = await Promise.all([
+                    fetch('/api/student/missions', { headers: { 'x-student-id': user.id! } }),
+                    fetch(`/api/student/rewards?studentId=${user.id}`)
+                ]);
+                if (missionsRes.ok) {
+                    const mData = await missionsRes.json();
+                    const missions = mData.data || mData.missions || [];
+                    setCompletedMissions(missions.filter((m: any) => m.completed));
+                }
+                if (rewardsRes.ok) {
+                    const rData = await rewardsRes.json();
+                    setTrophies(rData.trophies || []);
+                }
+            } catch (err) {
+                console.error('Error fetching badges:', err);
+            } finally {
+                setBadgesLoaded(true);
+            }
+        };
+        fetchBadges();
+    }, [activeTab, badgesLoaded, user?.id]);
 
     // Handle password change
     const handlePasswordChange = async () => {
@@ -306,7 +338,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 {visitedTabs.profile && (
                     <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={activeTab === 'profile' ? 'p-8' : 'hidden'}>
                             <h1 className="text-4xl font-black text-white mb-8">← Profile</h1>
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl items-stretch">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full items-stretch">
                                 {/* Left Side - Profile Information */}
                                 <div className="space-y-6 flex flex-col">
                                     <div className="space-y-4">
@@ -498,6 +530,43 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                                         >
                                             I-download
                                         </button>
+                                    </div>
+                                </div>
+
+                                {/* Right Side - Badges Achieved */}
+                                <div className="flex flex-col h-full">
+                                    <h3 className="text-2xl font-bold text-white mb-2 text-center">Mga Badge</h3>
+                                    <p className="text-slate-400 text-sm text-center mb-4">Mga nakamit mula sa misyon at milestone</p>
+                                    <div className="flex-1 bg-slate-800/30 border border-white/10 rounded-2xl p-4 overflow-y-auto max-h-[600px] space-y-3">
+                                        {/* Trophies */}
+                                        {trophies.length > 0 && trophies.map((trophy: any, i: number) => (
+                                            <div key={`trophy-${i}`} className="flex items-center gap-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+                                                <span className="text-3xl">{trophy.icon || '🏆'}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-white font-bold text-sm truncate">{trophy.title}</p>
+                                                    <p className="text-yellow-400 text-xs">Trophy</p>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {/* Completed Missions */}
+                                        {completedMissions.length > 0 && completedMissions.map((mission: any, i: number) => (
+                                            <div key={`mission-${i}`} className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/20 rounded-xl">
+                                                <span className="text-3xl">🎯</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-white font-bold text-sm truncate">{mission.title}</p>
+                                                    <p className="text-green-400 text-xs">+{mission.xp_reward} XP · +{mission.coin_reward} Coins</p>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {trophies.length === 0 && completedMissions.length === 0 && (
+                                            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                                                <span className="text-5xl mb-4">🎖️</span>
+                                                <p className="font-semibold">Wala pang badge</p>
+                                                <p className="text-xs mt-1">Kumpletuhin ang mga misyon para makakuha!</p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
