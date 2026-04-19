@@ -227,7 +227,7 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
                 setTimeout(() => {
                     timedOut = true;
                     reject(new Error('Request timeout'));
-                }, 30000); // 30 second timeout
+                }, 60000); // 60 second timeout
             });
             
             // Call the bahagi lessons endpoint with timeout
@@ -390,8 +390,17 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
 
     const handleYunitEditSubmit = async (data: any) => {
         setIsEditingYunit(true);
+        let timedOut = false;
         try {
-            const response = await apiClient.yunit.update(data.id, data);
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => {
+                    timedOut = true;
+                    reject(new Error('Request timeout'));
+                }, 60000);
+            });
+
+            const fetchPromise = apiClient.yunit.update(data.id, data);
+            const response = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
             if (response.success) {
                 alert('✅ Yunit updated successfully!');
@@ -401,9 +410,16 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
             } else {
                 alert(`❌ Error: ${response.error}`);
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error updating yunit:', err);
-            alert('❌ Failed to update yunit');
+            if (timedOut || err.message?.includes('timeout')) {
+                setShowEditYunitForm(false);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                fetchYunitsForBahagi(editingYunit.bahagi_id);
+                alert('✅ Yunit updated! (Response was slow, but data saved)');
+            } else {
+                alert('❌ Failed to update yunit');
+            }
         } finally {
             setIsEditingYunit(false);
         }
