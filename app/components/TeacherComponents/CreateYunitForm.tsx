@@ -34,7 +34,9 @@ export const CreateYunitForm: React.FC<CreateYunitFormProps> = ({
     const [description, setDescription] = useState('');
     const [topics, setTopics] = useState<TopicData[]>([]);
     const [mediaUrl, setMediaUrl] = useState('');
+    const [audioUrl, setAudioUrl] = useState('');
     const mediaInputRef = useRef<HTMLInputElement>(null);
+    const audioInputRef = useRef<HTMLInputElement>(null);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -53,8 +55,8 @@ export const CreateYunitForm: React.FC<CreateYunitFormProps> = ({
           quotes: t.quotes,
         }));
 
-        // First topic's audio becomes the yunit-level audio
-        const firstAudio = topics.find(t => t.audio)?.audio || '';
+        // Use dedicated yunit audio, fallback to first topic's audio
+        const yunitAudio = audioUrl || topics.find(t => t.audio)?.audio || '';
 
         const data = {
             bahagiId,
@@ -63,7 +65,7 @@ export const CreateYunitForm: React.FC<CreateYunitFormProps> = ({
             subtitle: description,
             discussion: JSON.stringify(topicsPayload),
             media_url: mediaUrl || (topics.find(t => t.images.length > 0)?.images[0] || ''),
-            audio_url: firstAudio,
+            audio_url: yunitAudio,
             lesson_order: undefined
         };
 
@@ -76,6 +78,7 @@ export const CreateYunitForm: React.FC<CreateYunitFormProps> = ({
         setDescription('');
         setTopics([]);
         setMediaUrl('');
+        setAudioUrl('');
     };
 
     const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,6 +86,14 @@ export const CreateYunitForm: React.FC<CreateYunitFormProps> = ({
         if (!file) return;
         const reader = new FileReader();
         reader.onloadend = () => setMediaUrl(reader.result as string);
+        reader.readAsDataURL(file);
+    };
+
+    const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onloadend = () => setAudioUrl(reader.result as string);
         reader.readAsDataURL(file);
     };
 
@@ -159,11 +170,26 @@ export const CreateYunitForm: React.FC<CreateYunitFormProps> = ({
                             >
                                 🖼
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => audioInputRef.current?.click()}
+                                className="shrink-0 w-12 h-12 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl flex items-center justify-center transition-all"
+                                title="Upload yunit audio"
+                            >
+                                🎵
+                            </button>
                             <input
                                 ref={mediaInputRef}
                                 type="file"
                                 accept="image/*"
                                 onChange={handleMediaUpload}
+                                className="hidden"
+                            />
+                            <input
+                                ref={audioInputRef}
+                                type="file"
+                                accept="audio/*"
+                                onChange={handleAudioUpload}
                                 className="hidden"
                             />
                         </div>
@@ -172,6 +198,13 @@ export const CreateYunitForm: React.FC<CreateYunitFormProps> = ({
                                 <img src={mediaUrl} alt="Cover" className="w-10 h-10 rounded-lg object-cover border border-slate-700" />
                                 <span className="text-xs text-slate-400">Cover image set</span>
                                 <button type="button" onClick={() => setMediaUrl('')} className="text-xs text-red-400 hover:text-red-300 ml-auto">Remove</button>
+                            </div>
+                        )}
+                        {audioUrl && (
+                            <div className="mt-2 flex items-center gap-2">
+                                <span className="text-lg">🎵</span>
+                                <audio src={audioUrl} controls className="h-8 flex-1" />
+                                <button type="button" onClick={() => setAudioUrl('')} className="text-xs text-red-400 hover:text-red-300">Remove</button>
                             </div>
                         )}
                     </div>
