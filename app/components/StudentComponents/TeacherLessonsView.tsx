@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { motion } from 'framer-motion';
 import { LessonCard } from './LessonCard';
 import { apiClient } from '@/lib/api-client';
@@ -11,6 +11,8 @@ interface TeacherLessonsViewProps {
   teacherId: string;
   teacherName: string;
   className: string;
+  cachedData?: any; // Pre-fetched lessons data
+  onYunitsCached?: (bahagiId: string, data: any) => void; // Callback to cache yunits data
   onSelectLesson: (bahagiId: string) => void;
   onBack: () => void;
 }
@@ -31,39 +33,51 @@ interface Lesson {
   difficulty: 'beginner' | 'intermediate' | 'advanced';
 }
 
-export const TeacherLessonsView: React.FC<TeacherLessonsViewProps> = ({
+const TeacherLessonsViewComponent: React.FC<TeacherLessonsViewProps> = ({
   studentId,
   studentName,
   teacherId,
   teacherName,
   className,
+  cachedData,
+  onYunitsCached,
   onSelectLesson,
   onBack
 }) => {
-  console.log('🎓 [TeacherLessonsView] Rendered with props:', {
-    studentId,
-    teacherId,
-    teacherName,
-    className
-  });
-
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!cachedData); // Don't show loading if we have cached data
   const [error, setError] = useState<string | null>(null);
   const [totalXp, setTotalXp] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
 
+  // Use cached data immediately if available
   useEffect(() => {
+    if (cachedData) {
+      const data = cachedData.data || cachedData;
+      setLessons(data.lessons || []);
+      setCompletedCount(data.completedLessons || 0);
+      
+      const total = (data.lessons || []).reduce((sum: number, lesson: any) => {
+        return sum + (lesson.xpReward * lesson.totalYunits);
+      }, 0);
+      setTotalXp(total);
+      setIsLoading(false);
+      return;
+    }
+  }, [cachedData]);
+
+  useEffect(() => {
+    // Skip fetching if we already have cached data
+    if (cachedData) {
+      return;
+    }
+
     const fetchLessons = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
-        console.log('📚 Fetching teacher lessons for:', { studentId, teacherId });
-        console.log('📚 Timestamp:', new Date().toISOString());
         const result = await apiClient.student.getTeacherLessons(studentId, teacherId);
-
-        console.log('📚 Teacher lessons response:', result);
 
         if (!result.success && result.error) {
           throw new Error(result.error);
@@ -71,13 +85,6 @@ export const TeacherLessonsView: React.FC<TeacherLessonsViewProps> = ({
 
         // Handle both response formats (wrapped in data or direct)
         const data = result.data || result;
-        console.log('📚 Lesson titles received:', data.lessons?.map((l: any) => ({ id: l.id, title: l.title })));
-        console.log('📚 Progress data:', data.lessons?.map((l: any) => ({ 
-          title: l.title, 
-          passedYunits: l.passedYunits, 
-          totalYunits: l.totalYunits,
-          progress: `${l.passedYunits}/${l.totalYunits}` 
-        })));
         setLessons(data.lessons || []);
         setCompletedCount(data.completedLessons || 0);
 
@@ -86,8 +93,6 @@ export const TeacherLessonsView: React.FC<TeacherLessonsViewProps> = ({
           return sum + (lesson.xpReward * lesson.totalYunits);
         }, 0);
         setTotalXp(total);
-        
-        console.log('📚 Loaded lessons:', data.lessons?.length || 0);
       } catch (err: any) {
         console.error('Failed to fetch teacher lessons:', err);
         setError(err.message || 'Failed to load lessons');
@@ -99,22 +104,71 @@ export const TeacherLessonsView: React.FC<TeacherLessonsViewProps> = ({
     if (studentId && teacherId) {
       fetchLessons();
     }
-  }, [studentId, teacherId]);
+  }, [studentId, teacherId, cachedData]);
+
+  // Pre-fetch all yunits for all lessons when lessons are loaded
+  useEffect(() => {
+    if (!lessons || lessons.length === 0 || !onYunitsCached) return;
+
+    const preFetchAllYunits = async () => {
+      // Fetch yunits for all lessons in parallel
+      const preFetchPromises = lessons.map(async (lesson) => {
+        try {
+          const response = await fetch(`/api/student/yunits-progress?bahagiId=${lesson.id}&studentId=${studentId}`);
+          const data = await response.json();
+          
+          if (data.success) {
+            // Cache this data in parent component - ensure string key
+            onYunitsCached(String(lesson.id), data);
+            return { lessonId: lesson.id, data };
+          }
+        } catch (err) {
+          console.error(`Failed to pre-fetch yunits for lesson ${lesson.id}:`, err);
+        }
+        return null;
+      });
+
+      // Wait for all pre-fetches to complete
+      await Promise.all(preFetchPromises);
+    };
+
+    // Start pre-fetching immediately for instant caching
+    preFetchAllYunits();
+  }, [lessons, studentId, onYunitsCached]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-linear-to-b from-slate-950 to-slate-900">
-        <div className="text-center">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="text-6xl mb-4"
-          >
-            📚
-          </motion.div>
-          <p className="text-slate-400 text-lg">Loading your lessons...</p>
-          <p className="text-slate-600 text-sm mt-2">Preparing content from {teacherName}</p>
-          <p className="text-slate-700 text-xs mt-1">Teacher ID: {teacherId}</p>
+      <div className="min-h-screen bg-linear-to-b from-slate-950 to-slate-900 p-6 md:p-10">
+        <div className="max-w-7xl mx-auto">
+          {/* Skeleton Header */}
+          <div className="mb-12 animate-pulse">
+            <div className="h-12 bg-slate-800/50 rounded-lg w-64 mb-4"></div>
+            <div className="h-4 bg-slate-800/50 rounded w-48 mb-2"></div>
+            <div className="h-4 bg-slate-800/50 rounded w-56"></div>
+          </div>
+
+          {/* Skeleton Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-slate-800/50 rounded-lg p-4 animate-pulse">
+                <div className="h-8 bg-slate-700/50 rounded w-12 mb-2"></div>
+                <div className="h-3 bg-slate-700/50 rounded w-20 mb-1"></div>
+                <div className="h-6 bg-slate-700/50 rounded w-16"></div>
+              </div>
+            ))}
+          </div>
+
+          {/* Skeleton Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-slate-800/50 rounded-xl p-6 animate-pulse">
+                <div className="h-40 bg-slate-700/50 rounded-lg mb-4"></div>
+                <div className="h-6 bg-slate-700/50 rounded w-3/4 mb-2"></div>
+                <div className="h-4 bg-slate-700/50 rounded w-full mb-1"></div>
+                <div className="h-4 bg-slate-700/50 rounded w-2/3"></div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -258,3 +312,5 @@ export const TeacherLessonsView: React.FC<TeacherLessonsViewProps> = ({
     </div>
   );
 };
+
+export const TeacherLessonsView = memo(TeacherLessonsViewComponent);

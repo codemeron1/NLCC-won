@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 
 interface LessonCardProps {
@@ -18,7 +18,7 @@ interface LessonCardProps {
   onStart: () => void;
 }
 
-export const LessonCard: React.FC<LessonCardProps> = ({
+const LessonCardComponent: React.FC<LessonCardProps> = ({
   bahagiNumber,
   yunitCount,
   title,
@@ -43,16 +43,6 @@ export const LessonCard: React.FC<LessonCardProps> = ({
   
   // Ensure minimum visible width if there's any progress
   const displayPercentage = passedYunits > 0 && progressPercentage < 5 ? 5 : progressPercentage;
-  
-  // Log progress for debugging
-  console.log(`[LessonCard] ${title}:`, {
-    passedYunits,
-    totalYunits,
-    progressPercentage: `${progressPercentage}%`,
-    displayPercentage: `${displayPercentage}%`,
-    isCompleted,
-    isUnlocked
-  });
 
   return (
     <motion.div
@@ -209,3 +199,5 @@ export const LessonCard: React.FC<LessonCardProps> = ({
     </motion.div>
   );
 };
+
+export const LessonCard = memo(LessonCardComponent);

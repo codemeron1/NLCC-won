@@ -31,15 +31,15 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
   studentName,
   onNavigate
 }) => {
-  // Initialize view and selections from localStorage
+  // Cache for lessons data to avoid re-fetching
+  const [lessonsCache, setLessonsCache] = useState<any>(null);
+  const [classesCache, setClassesCache] = useState<any>(null);
+  const [yunitsCache, setYunitsCache] = useState<Record<string, any>>({});
+
+  // Initialize view from localStorage or default
   const getInitialView = (): ViewType => {
-    if (typeof window !== 'undefined') {
-      const savedView = localStorage.getItem('magAralView');
-      if (savedView && ['lessons', 'classes', 'bahagis', 'yunits', 'lessonContent', 'assessment'].includes(savedView)) {
-        return savedView as ViewType;
-      }
-    }
-    return 'classes';
+    // Don't restore view on mount - let teacher check determine it
+    return 'classes'; // Temporary, will be updated after teacher check
   };
 
   const getInitialClassId = (): string | null => {
@@ -69,36 +69,39 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
   const [yunitViewKey, setYunitViewKey] = useState(0); // For forcing YunitView refresh
   const [lessonsViewKey, setLessonsViewKey] = useState(0); // For forcing TeacherLessonsView refresh
 
-  // Reset to classes view on first mount (ensure clean state)
+  // Fetch student's teacher info and pre-fetch lessons on component mount
   useEffect(() => {
-    setCurrentView('classes');
-    localStorage.removeItem('magAralBahagiId'); // Clear old bahagi selection
-  }, []); // Run only once on mount
-
-  // Fetch student's teacher info on component mount
-  useEffect(() => {
-    const fetchTeacherInfo = async () => {
+    const fetchTeacherInfoAndLessons = async () => {
       try {
-        console.log('🔍 [MagAralPage] Fetching teacher info for student:', studentId);
         const res = await apiClient.student.getDetails(studentId);
-        console.log('🔍 [MagAralPage] Teacher info response:', res);
         
         if (res.success) {
-          console.log('🔍 [MagAralPage] Teacher info data:', res.data);
           setTeacherInfo(res.data);
-          // Always start with classes view - let user choose which class
+          
+          // Pre-fetch lessons if teacher is assigned (but stay on classes view)
+          if (res.data?.isAssigned && res.data?.teacherId) {
+            // Fetch lessons in background for faster access later
+            const lessonsRes = await apiClient.student.getTeacherLessons(studentId, res.data.teacherId);
+            if (lessonsRes.success) {
+              setLessonsCache(lessonsRes);
+            }
+          }
+          
+          // Always show classes view first
+          setCurrentView('classes');
         } else {
-          console.error('🔍 [MagAralPage] Failed to get teacher info:', res.error);
+          setCurrentView('classes'); // Fallback to classes view
         }
       } catch (err) {
         console.error('Failed to fetch teacher info:', err);
+        setCurrentView('classes'); // Fallback to classes view
       } finally {
         setIsLoadingTeacher(false);
       }
     };
 
     if (studentId) {
-      fetchTeacherInfo();
+      fetchTeacherInfoAndLessons();
     }
   }, [studentId]);
   
@@ -144,9 +147,27 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
     setCurrentView('lessons');
   };
 
-  const handleSelectLesson = (bahagiId: string) => {
+  const handleSelectLesson = async (bahagiId: string) => {
+    const key = String(bahagiId);
     setSelectedBahagiId(bahagiId);
     setCurrentView('yunits');
+    
+    // Only fetch if not already cached
+    if (!yunitsCache[key]) {
+      try {
+        const response = await fetch(`/api/student/yunits-progress?bahagiId=${bahagiId}&studentId=${studentId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          setYunitsCache(prev => ({
+            ...prev,
+            [key]: data
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to fetch yunits:', err);
+      }
+    }
   };
 
   const handleSelectBahagi = (bahagiId: string | number) => {
@@ -169,6 +190,12 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
     setSelectedYunitId(yunitId);
   };
 
+  const handleLessonCompleted = () => {
+    // Don't invalidate cache - keep the data to prevent skeleton screens
+    // Progress will be updated on next navigation or refresh
+    // This provides a smoother UX without loading states
+  };
+
   const handleAssessmentComplete = (result: any) => {
     setRewardData(result);
     setShowRewardModal(true);
@@ -177,8 +204,18 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
   const handleCloseReward = () => {
     setShowRewardModal(false);
     if (rewardData?.success && rewardData?.progress?.is_passed) {
-      // Refresh YunitView when returning after assessment completion
+      // Refresh YunitView to show updated progress
       setYunitViewKey(prev => prev + 1);
+      
+      // Invalidate yunits cache for this specific lesson to fetch fresh data
+      if (selectedBahagiId) {
+        setYunitsCache(prev => {
+          const newCache = { ...prev };
+          delete newCache[selectedBahagiId.toString()];
+          return newCache;
+        });
+      }
+      
       // Go back to yunits view after successful completion
       setCurrentView('yunits');
     }
@@ -189,13 +226,12 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
       setCurrentView('classes');
       setSelectedClassId(null);
     } else if (currentView === 'yunits') {
-      // Refresh TeacherLessonsView when going back from yunits
-      setLessonsViewKey(prev => prev + 1);
+      // Don't refresh lessons - use cache for instant navigation
       setCurrentView('lessons');
       setSelectedBahagiId(null);
     } else if (currentView === 'lessonContent') {
-      // Refresh YunitView when going back from lesson content
-      setYunitViewKey(prev => prev + 1);
+      // Go back to yunits view without clearing cache
+      // This prevents skeleton screens when navigating back
       setCurrentView('yunits');
     } else if (currentView === 'assessment') {
       setCurrentView('lessonContent');
@@ -225,6 +261,14 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
           teacherId={teacherInfo.teacherId}
           teacherName={teacherInfo.teacherName || 'Your Teacher'}
           className={teacherInfo.className || 'Your Class'}
+          cachedData={lessonsCache}
+          onYunitsCached={(bahagiId, data) => {
+            const key = String(bahagiId);
+            setYunitsCache(prev => ({
+              ...prev,
+              [key]: data
+            }));
+          }}
           onSelectLesson={handleSelectLesson}
           onBack={() => setCurrentView('classes')}
         />
@@ -250,6 +294,8 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
         <ClassView
           studentId={studentId}
           studentName={studentName}
+          cachedData={classesCache}
+          onDataFetched={(data) => setClassesCache(data)}
           onSelectClass={handleSelectClass}
           onBack={() => onNavigate?.('dashboard')}
         />
@@ -262,6 +308,13 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
           key={yunitViewKey}
           studentId={studentId}
           bahagiId={selectedBahagiId}
+          cachedData={yunitsCache[String(selectedBahagiId)]}
+          onDataFetched={(data) => {
+            setYunitsCache(prev => ({
+              ...prev,
+              [selectedBahagiId.toString()]: data
+            }));
+          }}
           onStartAssessment={handleStartAssessment}
           onBack={goBack}
         />
@@ -272,8 +325,10 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
           yunitId={selectedYunitId}
           bahagiId={selectedBahagiId}
           studentId={studentId}
+          cachedYunits={yunitsCache[selectedBahagiId.toString()]}
           onComplete={handleLessonComplete}
           onNextYunit={handleNextYunit}
+          onLessonCompleted={handleLessonCompleted}
           onBack={goBack}
         />
       )}

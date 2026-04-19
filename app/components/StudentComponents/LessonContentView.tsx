@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { InteractiveSuriinPage } from './InteractiveSuriinPage';
@@ -12,8 +12,10 @@ interface LessonContentViewProps {
   yunitId: string | number;
   bahagiId: string | number;
   studentId: string;
+  cachedYunits?: any; // Pre-fetched yunits data
   onComplete: () => void;
   onNextYunit: (yunitId: string | number) => void;
+  onLessonCompleted?: () => void; // Callback when a lesson is marked complete
   onBack: () => void;
 }
 
@@ -30,19 +32,21 @@ interface LessonData {
   isLocked?: boolean;
 }
 
-export const LessonContentView: React.FC<LessonContentViewProps> = ({
+const LessonContentViewComponent: React.FC<LessonContentViewProps> = ({
   yunitId,
   bahagiId,
   studentId,
+  cachedYunits,
   onComplete,
   onNextYunit,
+  onLessonCompleted,
   onBack
 }) => {
   const [lesson, setLesson] = useState<LessonData | null>(null);
   const [allYunits, setAllYunits] = useState<LessonData[]>([]);
   const [bahagiIconPath, setBahagiIconPath] = useState<string>('');
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!cachedYunits); // Don't show loading if we have cached data
   const [displayedText, setDisplayedText] = useState('');
   const [isAnimating, setIsAnimating] = useState(false);
   const [showCompleteButton, setShowCompleteButton] = useState(false);
@@ -53,33 +57,88 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch all yunits for the bahagi (once)
+  // Use cached data immediately if available
   useEffect(() => {
+    if (cachedYunits?.data) {
+      setAllYunits(cachedYunits.data);
+      
+      // Find current yunit index
+      const index = cachedYunits.data.findIndex((y: LessonData) => y.id === Number(yunitId));
+      setCurrentIndex(index >= 0 ? index : 0);
+      
+      // Get current yunit from cache and display immediately
+      const currentYunit = cachedYunits.data.find((y: LessonData) => y.id === Number(yunitId));
+      if (currentYunit) {
+        // Set lesson from cache immediately - no loading!
+        setLesson(currentYunit);
+        setIsLoading(false);
+        
+        // Fetch icon in background without blocking UI
+        fetchIconInBackground(yunitId);
+      }
+    }
+  }, [cachedYunits, yunitId]);
+
+  // Fetch only the icon without showing loading state
+  const fetchIconInBackground = async (yId: string | number) => {
+    try {
+      const response = await fetch(`/api/rest/yunits/${yId}`);
+      const data = await response.json();
+      
+      if (data.success && data.data?.bahagi_icon_path) {
+        setBahagiIconPath(data.data.bahagi_icon_path);
+        // Update lesson with icon path
+        setLesson(prev => prev ? {
+          ...prev,
+          bahagi_icon_path: data.data.bahagi_icon_path
+        } : null);
+      }
+    } catch (err) {
+      console.error('[LessonContentView] Error fetching icon (non-critical):', err);
+      // Silently fail - lesson content already shown
+    }
+  };
+
+  // Fetch all yunits for the bahagi (only if not cached)
+  useEffect(() => {
+    // Skip if we have cached data
+    if (cachedYunits) {
+      return;
+    }
+
     const fetchYunits = async () => {
       try {
         setIsLoading(true);
-        console.log('[LessonContentView] Fetching yunits for bahagi:', bahagiId);
         
-        const response = await fetch(`/api/student/yunits-progress?bahagiId=${bahagiId}&studentId=${studentId}`);
-        const data = await response.json();
+        // Fetch yunits and first yunit details in parallel
+        const [yunitsResponse, firstYunitResponse] = await Promise.all([
+          fetch(`/api/student/yunits-progress?bahagiId=${bahagiId}&studentId=${studentId}`),
+          fetch(`/api/rest/yunits/${yunitId}`)
+        ]);
         
-        console.log('[LessonContentView] Yunits data:', data);
+        const [yunitsData, firstYunitData] = await Promise.all([
+          yunitsResponse.json(),
+          firstYunitResponse.json()
+        ]);
         
-        if (data.success && data.data) {
-          setAllYunits(data.data);
+        if (yunitsData.success && yunitsData.data) {
+          setAllYunits(yunitsData.data);
           
           // Find current yunit index
-          const index = data.data.findIndex((y: LessonData) => y.id === Number(yunitId));
+          const index = yunitsData.data.findIndex((y: LessonData) => y.id === Number(yunitId));
           setCurrentIndex(index >= 0 ? index : 0);
           
-          // Fetch bahagi icon once
-          const firstYunit = data.data[0];
-          if (firstYunit?.id) {
-            const lessonResponse = await fetch(`/api/rest/yunits/${firstYunit.id}`);
-            const lessonData = await lessonResponse.json();
-            if (lessonData.success && lessonData.data?.bahagi_icon_path) {
-              setBahagiIconPath(lessonData.data.bahagi_icon_path);
-            }
+          // Set bahagi icon from first yunit response
+          if (firstYunitData.success && firstYunitData.data?.bahagi_icon_path) {
+            setBahagiIconPath(firstYunitData.data.bahagi_icon_path);
+          }
+          
+          // Set the current lesson immediately from parallel fetch
+          if (firstYunitData.success && firstYunitData.data) {
+            setLesson({
+              ...firstYunitData.data,
+              bahagi_icon_path: firstYunitData.data.bahagi_icon_path
+            });
           }
         }
       } catch (err) {
@@ -90,7 +149,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
     };
 
     fetchYunits();
-  }, [bahagiId, studentId]);
+  }, [bahagiId, studentId, yunitId, cachedYunits]);
 
   // Update current lesson when yunitId changes
   useEffect(() => {
@@ -135,7 +194,6 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
   // Mark current lesson as complete in database
   const markLessonComplete = async (lessonId: string | number) => {
     try {
-      console.log('[Lesson Complete] Attempting to save:', { lessonId, studentId, timestamp: new Date().toISOString() });
       
       const response = await fetch(`/api/student/lesson/${lessonId}/complete`, {
         method: 'POST',
@@ -155,6 +213,11 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
         coins: data.rewards?.coins,
         fullData: data
       });
+      
+      // Notify parent component that lesson was completed (to invalidate cache)
+      if (onLessonCompleted) {
+        onLessonCompleted();
+      }
       
       return data;
     } catch (error) {
@@ -238,10 +301,37 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin text-4xl mb-4">📖</div>
-          <p className="text-slate-400">Loading lesson...</p>
+      <div className="flex items-center justify-center h-screen bg-linear-to-b from-slate-950 to-slate-900">
+        <div className="max-w-4xl w-full p-8">
+          {/* Skeleton for lesson content */}
+          <div className="animate-pulse space-y-6">
+            {/* Books icon skeleton */}
+            <div className="flex justify-center mb-4">
+              <div className="h-16 w-16 bg-slate-800/50 rounded-lg"></div>
+            </div>
+            
+            {/* Title skeleton */}
+            <div className="space-y-3">
+              <div className="h-10 bg-slate-800/50 rounded-lg w-3/4 mx-auto"></div>
+              <div className="h-6 bg-slate-800/50 rounded-lg w-1/2 mx-auto"></div>
+            </div>
+            
+            {/* Content box skeleton */}
+            <div className="bg-slate-800/50 border-2 border-slate-700 rounded-2xl p-8 mt-8">
+              <div className="space-y-3">
+                <div className="h-4 bg-slate-700/50 rounded w-full"></div>
+                <div className="h-4 bg-slate-700/50 rounded w-11/12"></div>
+                <div className="h-4 bg-slate-700/50 rounded w-10/12"></div>
+                <div className="h-4 bg-slate-700/50 rounded w-full"></div>
+                <div className="h-4 bg-slate-700/50 rounded w-9/12"></div>
+              </div>
+            </div>
+            
+            {/* Avatar skeleton */}
+            <div className="flex justify-end">
+              <div className="h-48 w-48 bg-slate-800/50 rounded-full"></div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -322,10 +412,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
       <InteractivePagyamaninPage
         imageUrl={lesson.media_url}
         onBack={() => setShowPagyamaninPage(false)}
-        onNext={async () => {
-          // Mark current lesson as complete
-          await markLessonComplete(yunitId);
-          
+        onNext={() => {
           const nextYunit = allYunits[currentIndex + 1];
           if (nextYunit) {
             setShowPagyamaninPage(false);
@@ -334,6 +421,11 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
             setShowPagyamaninPage(false);
             handleComplete();
           }
+          
+          // Mark lesson complete in background
+          markLessonComplete(yunitId).catch(err =>
+            console.error('Background completion failed:', err)
+          );
         }}
       />
     );
@@ -346,10 +438,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
         currentIndex={currentIndex}
         totalLessons={allYunits.length}
         onBack={() => setShowInteractivePage(false)}
-        onNext={async () => {
-          // Mark current lesson as complete
-          await markLessonComplete(yunitId);
-          
+        onNext={() => {
           const nextYunit = allYunits[currentIndex + 1];
           if (nextYunit) {
             setShowInteractivePage(false);
@@ -358,13 +447,18 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
             setShowInteractivePage(false);
             handleComplete();
           }
+          
+          // Mark lesson complete in background
+          markLessonComplete(yunitId).catch(err =>
+            console.error('Background completion failed:', err)
+          );
         }}
       />
     );
   }
 
   return (
-    <div className="relative h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 overflow-hidden">
+    <div className="relative h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-4 overflow-hidden">
       {/* Back Button */}
       <button
         onClick={onBack}
@@ -381,7 +475,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.3 }}
-            className="relative bg-gradient-to-br from-green-900 to-green-950 rounded-3xl shadow-2xl border-8 border-amber-900 p-8"
+            className="relative bg-linear-to-br from-green-900 to-green-950 rounded-3xl shadow-2xl border-8 border-amber-900 p-8"
             style={{
               backgroundImage: 'linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)',
               backgroundSize: '20px 20px'
@@ -411,7 +505,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
               {/* Text Content - Takes 2 columns */}
               <div className="lg:col-span-2">
-                <div className="bg-green-950/50 rounded-2xl p-6 max-h-[500px] overflow-y-auto relative backdrop-blur-sm border-2 border-white/10">
+                <div className="bg-green-950/50 rounded-2xl p-6 max-h-125 overflow-y-auto relative backdrop-blur-sm border-2 border-white/10">
                   {/* Chalk Text Animation */}
                   <motion.div
                     className="text-white text-xl md:text-2xl lg:text-3xl leading-relaxed whitespace-pre-wrap font-medium"
@@ -518,7 +612,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
                 {/* Next Button - Show if not last yunit */}
                 {currentIndex < allYunits.length - 1 && (
                   <button
-                    onClick={async () => {
+                    onClick={() => {
                       // If Suriin lesson, show interactive page first
                       if (isSuriinLesson) {
                         setShowInteractivePage(true);
@@ -526,13 +620,16 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
                       } else if (isPagyamaninLesson) {
                         setShowPagyamaninPage(true);
                       } else {
-                        // Mark current lesson as complete before moving to next
-                        await markLessonComplete(yunitId);
-                        
+                        // Navigate immediately for instant response
                         const nextYunit = allYunits[currentIndex + 1];
                         if (nextYunit) {
                           onNextYunit(nextYunit.id);
                         }
+                        
+                        // Mark lesson complete in background (non-blocking)
+                        markLessonComplete(yunitId).catch(err => 
+                          console.error('Background completion failed:', err)
+                        );
                       }
                     }}
                     className="px-6 py-3 bg-brand-purple hover:bg-brand-purple/80 text-white rounded-xl font-black text-base uppercase tracking-widest transition-all shadow-lg hover:shadow-brand-purple/50 hover:scale-105"
@@ -572,3 +669,5 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
     </div>
   );
 };
+
+export const LessonContentView = memo(LessonContentViewComponent);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { motion } from 'framer-motion';
 
 interface Yunit {
@@ -21,34 +21,53 @@ interface Yunit {
 interface YunitViewProps {
   studentId: string;
   bahagiId: string | number;
+  cachedData?: any;
+  onDataFetched?: (data: any) => void;
   onStartAssessment: (yunitId: string | number) => void;
   onBack: () => void;
 }
 
-export const YunitView: React.FC<YunitViewProps> = ({
+const YunitViewComponent: React.FC<YunitViewProps> = ({
   studentId,
   bahagiId,
+  cachedData,
+  onDataFetched,
   onStartAssessment,
   onBack
 }) => {
   const [yunits, setYunits] = useState<Yunit[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!cachedData);
   const [error, setError] = useState<string | null>(null);
 
+  // Use cached data immediately if available
   useEffect(() => {
+    if (cachedData) {
+      setYunits(cachedData.data || []);
+      setIsLoading(false);
+      return;
+    }
+  }, [cachedData]);
+
+  useEffect(() => {
+    // Skip fetching if we already have cached data
+    if (cachedData) {
+      return;
+    }
+
     const fetchYunits = async () => {
       try {
         setIsLoading(true);
-        console.log('[YunitView] Fetching yunits with progress for bahagiId:', bahagiId, 'studentId:', studentId);
         
         const response = await fetch(`/api/student/yunits-progress?bahagiId=${bahagiId}&studentId=${studentId}`);
         const data = await response.json();
         
-        console.log('[YunitView] API response:', data);
-        
         if (data.success && data.data) {
           setYunits(data.data);
-          console.log('[YunitView] Loaded', data.data.length, 'yunits with lock status');
+          
+          // Cache the fetched data
+          if (onDataFetched) {
+            onDataFetched(data);
+          }
         } else {
           throw new Error(data.error || 'Failed to fetch yunits');
         }
@@ -61,14 +80,35 @@ export const YunitView: React.FC<YunitViewProps> = ({
     };
 
     fetchYunits();
-  }, [studentId, bahagiId]);
+  }, [studentId, bahagiId, cachedData, onDataFetched]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin text-4xl mb-4">📖</div>
-          <p className="text-slate-400">Loading lessons...</p>
+      <div className="flex flex-col gap-6 p-6 h-full overflow-auto">
+        {/* Skeleton Header */}
+        <div className="animate-pulse">
+          <div className="h-8 bg-slate-800/50 rounded w-32 mb-4"></div>
+          <div className="h-10 bg-slate-800/50 rounded w-48 mb-2"></div>
+          <div className="h-4 bg-slate-800/50 rounded w-64"></div>
+        </div>
+
+        {/* Skeleton Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="p-6 bg-slate-800/50 border-2 border-slate-700 rounded-2xl animate-pulse">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-12 h-12 bg-slate-700/50 rounded"></div>
+                <div className="flex-1">
+                  <div className="h-6 bg-slate-700/50 rounded w-3/4 mb-2"></div>
+                  <div className="h-4 bg-slate-700/50 rounded w-1/2"></div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-4 bg-slate-700/50 rounded w-24"></div>
+                <div className="h-4 bg-slate-700/50 rounded w-32"></div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -111,7 +151,7 @@ export const YunitView: React.FC<YunitViewProps> = ({
                   yunit.isLocked
                     ? 'bg-slate-900/50 border-slate-800 cursor-not-allowed opacity-60'
                     : yunit.completed
-                    ? 'bg-gradient-to-br from-green-900/20 to-emerald-900/20 border-green-700 hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20'
+                    ? 'bg-linear-to-br from-green-900/20 to-emerald-900/20 border-green-700 hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20'
                     : 'bg-slate-800 border-slate-700 hover:border-brand-purple hover:shadow-lg hover:shadow-brand-purple/20'
                 }`}
               >
@@ -129,7 +169,7 @@ export const YunitView: React.FC<YunitViewProps> = ({
                 <div className="space-y-4">
                   {/* Header */}
                   <div className="flex items-start gap-3">
-                    <div className="text-3xl flex-shrink-0">
+                    <div className="text-3xl shrink-0">
                       {yunit.completed ? '✅' : yunit.isLocked ? '🔒' : '📖'}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -209,3 +249,5 @@ export const YunitView: React.FC<YunitViewProps> = ({
     </div>
   );
 };
+
+export const YunitView = memo(YunitViewComponent);
