@@ -449,20 +449,20 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
           className="flex-1 bg-slate-800/80 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-6 md:p-10 shadow-xl h-[calc(100vh-8rem)] flex flex-col overflow-y-auto"
         >
           {/* Header: Module Info + Slide Counter */}
-          <div className="flex items-start justify-between mb-2">
-            <p className="text-slate-400 text-sm">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-slate-400 text-base">
               Yunit {currentIndex + 1}
             </p>
             {allYunits.length > 0 && (
-              <span className="text-brand-purple font-semibold text-sm">
+              <span className="text-brand-purple font-semibold text-base">
                 {currentIndex + 1}/{allYunits.length} Slides
               </span>
             )}
           </div>
 
           {/* Lesson Title */}
-          <div className="flex items-center gap-3 mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold text-brand-purple">
+          <div className="flex items-center gap-4 mb-8">
+            <h1 className="text-3xl md:text-4xl font-bold text-brand-purple">
               {lesson.title}
             </h1>
             {lesson.audio_url && (
@@ -483,7 +483,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
                     setIsYunitAudioPlaying(true);
                   }
                 }}
-                className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all ${
                   isYunitAudioPlaying
                     ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                     : 'bg-brand-purple/20 text-brand-purple hover:bg-brand-purple/30'
@@ -491,28 +491,28 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
                 title={isYunitAudioPlaying ? 'Stop audio' : 'Play yunit audio'}
               >
                 {isYunitAudioPlaying ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
                 ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                 )}
               </button>
             )}
           </div>
 
           {/* Topic Content */}
-          <div className="mb-6 space-y-6">
+          <div className="mb-8 space-y-8">
             {parsedTopics.length > 0 ? (
               /* Structured topic rendering */
               parsedTopics.map((topic, idx) => {
                 const audioId = `topic-${idx}`;
                 return (
-                  <div key={idx} className="space-y-3">
+                  <div key={idx} className="space-y-4">
                     {topic.title && (
-                      <h3 className="text-lg font-bold text-white">{topic.title}</h3>
+                      <h3 className="text-xl font-bold text-white">{topic.title}</h3>
                     )}
                     {topic.content && (
                       <div
-                        className="text-slate-200 text-base leading-relaxed prose prose-invert max-w-none [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-white [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_hr]:border-slate-600"
+                        className="text-slate-200 text-lg leading-relaxed prose prose-invert prose-lg max-w-none [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-white [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_hr]:border-slate-600"
                         dangerouslySetInnerHTML={{ __html: topic.content }}
                       />
                     )}
@@ -536,13 +536,13 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
                               setPlayingAudioId(audioId);
                             }
                           }}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-base font-semibold transition-all ${
                             playingAudioId === audioId
                               ? 'bg-brand-purple text-white shadow-lg shadow-brand-purple/30'
                               : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700 hover:text-white'
                           }`}
                         >
-                          <span className="text-lg">{playingAudioId === audioId ? '🔊' : '🔇'}</span>
+                          <span className="text-xl">{playingAudioId === audioId ? '🔊' : '🔇'}</span>
                           {playingAudioId === audioId ? 'Naka-on ang Audio' : 'I-play ang Audio'}
                         </button>
                         <audio
@@ -553,77 +553,80 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
                         />
                       </div>
                     )}
-                    {/* Side by side: images + quotes */}
-                    {((topic.images && topic.images.length > 0) || (topic.quotes && topic.quotes.length > 0)) && (
-                      <div className="flex items-start gap-0">
-                        {/* Image column */}
-                        {topic.images && topic.images.length > 0 && (
-                          <div className="shrink-0">
-                            {topic.images.map((img, ii) => (
-                              <div key={ii}>
-                                <img src={img} alt={`${topic.title || 'Topic'} image ${ii + 1}`} className="w-56 h-auto object-contain" />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {/* Callout bubble */}
-                        {topic.quotes && topic.quotes.length > 0 && (
-                          <div className="relative flex-1 ml-2">
-                            {/* Triangle pointer */}
-                            {topic.images && topic.images.length > 0 && (
-                              <div className="absolute left-[-8px] top-4 w-0 h-0 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent border-r-[8px] border-r-slate-700/80" />
-                            )}
-                            <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-3 space-y-3">
-                              {topic.quotes.map((q, qi) => {
-                                const qAudioId = `quote-${idx}-${qi}`;
-                                return (
-                                  <div key={qi} className="space-y-1.5">
-                                    <p className="text-slate-200 text-sm leading-relaxed">&ldquo;{q.text}&rdquo;</p>
-                                    <button
-                                      disabled={!q.audio}
-                                      onClick={() => {
-                                        if (!q.audio) return;
-                                        const el = topicAudioRefs.current[qAudioId];
-                                        if (!el) return;
-                                        if (playingAudioId === qAudioId) {
-                                          el.pause();
-                                          el.currentTime = 0;
-                                          setPlayingAudioId(null);
-                                        } else {
-                                          Object.entries(topicAudioRefs.current).forEach(([k, a]) => {
-                                            if (a && k !== qAudioId) { a.pause(); a.currentTime = 0; }
-                                          });
-                                          el.play().catch(() => {});
-                                          setPlayingAudioId(qAudioId);
-                                        }
-                                      }}
-                                      className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                                        !q.audio
-                                          ? 'bg-slate-800/50 text-slate-600 cursor-not-allowed'
-                                          : playingAudioId === qAudioId
-                                            ? 'bg-brand-purple/80 text-white'
-                                            : 'bg-slate-700 text-slate-400 hover:text-white hover:bg-slate-600'
-                                      }`}
-                                    >
-                                      <span>{playingAudioId === qAudioId ? '🔊' : '🔇'}</span>
-                                      {!q.audio ? 'Walang Audio' : playingAudioId === qAudioId ? 'Naka-on' : 'I-play'}
-                                    </button>
-                                    {q.audio && (
-                                      <audio
-                                        ref={el => { topicAudioRefs.current[qAudioId] = el; }}
-                                        src={q.audio}
-                                        onEnded={() => setPlayingAudioId(null)}
-                                        className="hidden"
-                                      />
-                                    )}
+                    {/* Pairs laid out horizontally: image+callout grouped together */}
+                    {(() => {
+                      const images = topic.images || [];
+                      const quotes = topic.quotes || [];
+                      const maxLen = Math.max(images.length, quotes.length);
+                      if (maxLen === 0) return null;
+                      return (
+                        <div className="flex flex-wrap gap-5">
+                          {Array.from({ length: maxLen }).map((_, i) => {
+                            const img = images[i] || images[images.length - 1];
+                            const q = quotes[i];
+                            const qAudioId = `quote-${idx}-${i}`;
+                            return (
+                              <div key={i} className="flex items-center gap-3 flex-1 min-w-[300px]">
+                                {/* Image */}
+                                {img && (
+                                  <div className="shrink-0">
+                                    <img src={img} alt={`${topic.title || 'Topic'} image ${i + 1}`} className="w-44 md:w-52 h-auto object-contain" />
                                   </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                                )}
+                                {/* Callout */}
+                                {q && (
+                                  <div className="relative flex-1">
+                                    {img && (
+                                      <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-t-8 border-t-transparent border-b-8 border-b-transparent border-r-8 border-r-slate-700/80" />
+                                    )}
+                                    <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl px-5 py-4 space-y-2">
+                                      <p className="text-slate-200 text-base leading-relaxed">&ldquo;{q.text}&rdquo;</p>
+                                      <button
+                                        disabled={!q.audio}
+                                        onClick={() => {
+                                          if (!q.audio) return;
+                                          const el = topicAudioRefs.current[qAudioId];
+                                          if (!el) return;
+                                          if (playingAudioId === qAudioId) {
+                                            el.pause();
+                                            el.currentTime = 0;
+                                            setPlayingAudioId(null);
+                                          } else {
+                                            Object.entries(topicAudioRefs.current).forEach(([k, a]) => {
+                                              if (a && k !== qAudioId) { a.pause(); a.currentTime = 0; }
+                                            });
+                                            el.play().catch(() => {});
+                                            setPlayingAudioId(qAudioId);
+                                          }
+                                        }}
+                                        className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                                          !q.audio
+                                            ? 'bg-slate-800/50 text-slate-600 cursor-not-allowed'
+                                            : playingAudioId === qAudioId
+                                              ? 'bg-brand-purple/80 text-white'
+                                              : 'bg-slate-700 text-slate-400 hover:text-white hover:bg-slate-600'
+                                        }`}
+                                      >
+                                        <span>{playingAudioId === qAudioId ? '🔊' : '🔇'}</span>
+                                        {!q.audio ? 'Walang Audio' : playingAudioId === qAudioId ? 'Naka-on' : 'I-play'}
+                                      </button>
+                                      {q.audio && (
+                                        <audio
+                                          ref={el => { topicAudioRefs.current[qAudioId] = el; }}
+                                          src={q.audio}
+                                          onEnded={() => setPlayingAudioId(null)}
+                                          className="hidden"
+                                        />
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })
