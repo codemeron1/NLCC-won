@@ -619,23 +619,118 @@ export const EditAssessmentV2Form: React.FC<EditAssessmentV2FormProps> = ({
                                         <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1">Matching Pairs</label>
                                         {(question.options || []).map((option, oIdx) => (
                                             <div key={oIdx} className="space-y-3 bg-slate-900/50 p-4 rounded-lg border border-slate-800">
-                                                <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest bg-slate-800 px-2 py-1 rounded">Pair {oIdx + 1}</span>
-                                                <input
-                                                    type="text"
-                                                    value={option.text}
-                                                    onChange={(e) => handleUpdateOption(qIdx, oIdx, 'text', e.target.value)}
-                                                    placeholder="Text for left item"
-                                                    className="w-full bg-slate-700 border border-slate-600 text-white px-3 py-2 rounded-lg text-xs focus:border-brand-purple outline-none"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={option.match || ''}
-                                                    onChange={(e) => handleUpdateOption(qIdx, oIdx, 'match', e.target.value)}
-                                                    placeholder="Text for right item"
-                                                    className="w-full bg-slate-700 border border-slate-600 text-white px-3 py-2 rounded-lg text-xs focus:border-brand-purple outline-none"
-                                                />
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest bg-slate-800 px-2 py-1 rounded">Pair {oIdx + 1}</span>
+                                                    {(question.options || []).length > 2 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const updated = [...questions];
+                                                                updated[qIdx].options = updated[qIdx].options.filter((_, i) => i !== oIdx);
+                                                                setQuestions(updated);
+                                                            }}
+                                                            className="text-red-400 hover:text-red-300 text-[9px] font-black"
+                                                            title="Remove pair"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {/* Left item */}
+                                                <div className="space-y-2">
+                                                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest ml-1">Left Item</label>
+                                                    <input
+                                                        type="text"
+                                                        value={option.text}
+                                                        onChange={(e) => handleUpdateOption(qIdx, oIdx, 'text', e.target.value)}
+                                                        placeholder="Text for left item"
+                                                        className="w-full bg-slate-700 border border-slate-600 text-white px-3 py-2 rounded-lg text-xs focus:border-brand-purple outline-none"
+                                                    />
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*,audio/*"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (file) {
+                                                                readFileAsPreview(file, (preview) => handleUpdateOption(qIdx, oIdx, 'media', preview));
+                                                            }
+                                                        }}
+                                                        className="w-full bg-slate-800 border border-slate-700 text-slate-400 px-3 py-2 rounded-lg text-[10px] file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[9px] file:font-semibold file:bg-brand-sky/70 file:text-white"
+                                                    />
+                                                    {option.media && (
+                                                        <div className="space-y-1">
+                                                            {option.media.type?.startsWith('image') ? (
+                                                                <div className="bg-slate-700 border border-slate-600 rounded p-2 w-fit">
+                                                                    <img src={option.media.preview} alt="Left item" className="h-16 w-auto rounded object-cover" />
+                                                                    <p className="text-[7px] text-slate-400 mt-1 font-semibold">{option.media.name}</p>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="bg-slate-700 border border-slate-600 rounded p-2 space-y-1 w-fit">
+                                                                    <audio controls className="h-6 w-40 scale-75 origin-left">
+                                                                        <source src={option.media.preview} type={option.media.type} />
+                                                                    </audio>
+                                                                    <p className="text-[7px] text-slate-400 font-semibold">{option.media.name}</p>
+                                                                </div>
+                                                            )}
+                                                            <button type="button" onClick={() => handleUpdateOption(qIdx, oIdx, 'media', null)} className="text-[8px] text-red-400 hover:text-red-300 font-bold">Remove</button>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Right item */}
+                                                <div className="space-y-2">
+                                                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest ml-1">Right Item (Match)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={option.match || ''}
+                                                        onChange={(e) => handleUpdateOption(qIdx, oIdx, 'match', e.target.value)}
+                                                        placeholder="Text for right item"
+                                                        className="w-full bg-slate-700 border border-slate-600 text-white px-3 py-2 rounded-lg text-xs focus:border-brand-purple outline-none"
+                                                    />
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*,audio/*"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (file) {
+                                                                readFileAsPreview(file, (preview) => handleUpdateOption(qIdx, oIdx, 'matchMedia', preview));
+                                                            }
+                                                        }}
+                                                        className="w-full bg-slate-800 border border-slate-700 text-slate-400 px-3 py-2 rounded-lg text-[10px] file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[9px] file:font-semibold file:bg-brand-sky/70 file:text-white"
+                                                    />
+                                                    {option.matchMedia && (
+                                                        <div className="space-y-1">
+                                                            {option.matchMedia.type?.startsWith('image') ? (
+                                                                <div className="bg-slate-700 border border-slate-600 rounded p-2 w-fit">
+                                                                    <img src={option.matchMedia.preview} alt="Right item" className="h-16 w-auto rounded object-cover" />
+                                                                    <p className="text-[7px] text-slate-400 mt-1 font-semibold">{option.matchMedia.name}</p>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="bg-slate-700 border border-slate-600 rounded p-2 space-y-1 w-fit">
+                                                                    <audio controls className="h-6 w-40 scale-75 origin-left">
+                                                                        <source src={option.matchMedia.preview} type={option.matchMedia.type} />
+                                                                    </audio>
+                                                                    <p className="text-[7px] text-slate-400 font-semibold">{option.matchMedia.name}</p>
+                                                                </div>
+                                                            )}
+                                                            <button type="button" onClick={() => handleUpdateOption(qIdx, oIdx, 'matchMedia', null)} className="text-[8px] text-red-400 hover:text-red-300 font-bold">Remove</button>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         ))}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const updated = [...questions];
+                                                updated[qIdx].options = [...updated[qIdx].options, { text: '', media: null, match: '', matchMedia: null }];
+                                                setQuestions(updated);
+                                            }}
+                                            className="text-[9px] font-black text-brand-sky px-3 py-2 rounded border border-brand-sky/30 hover:bg-brand-sky/10"
+                                        >
+                                            + Add Pair
+                                        </button>
                                     </div>
                                 )}
 
