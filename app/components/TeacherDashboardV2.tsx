@@ -205,8 +205,15 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
                     setClassBahagi([]);
                 }
                 
-                // Clear lessons (we'll show bahagi with nested yunits instead)
-                setClassLessons([]);
+                // Fetch standalone lessons for this class
+                try {
+                    const lessonsRes = await fetch(`/api/teacher/class-lessons?classId=${classId}`);
+                    const lessonsData = await lessonsRes.json();
+                    setClassLessons(lessonsData.lessons || []);
+                } catch (lessonsErr) {
+                    console.warn('Failed to fetch lessons:', lessonsErr);
+                    setClassLessons([]);
+                }
             } catch (err) {
                 console.error('Error fetching class data:', err);
                 setClassBahagi([]);
@@ -385,18 +392,40 @@ export const TeacherDashboardV2: React.FC<TeacherDashboardV2Props> = ({ onLogout
     // Handle lesson form submission
     const handleLessonSubmit = async (data: any) => {
         try {
-            const response = await apiClient.lesson.addItem('0', {
-                ...data,
-                teacher_id: user?.id,
-                class_name: selectedClassName
+            const response = await fetch('/api/teacher/create-lesson', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: data.title,
+                    description: data.description,
+                    category: data.category,
+                    icon: data.icon,
+                    color: data.color,
+                    teacherId: user?.id,
+                    className: selectedClassName,
+                    classId: selectedClassId
+                })
             });
 
-            if (response.success) {
+            const result = await response.json();
+
+            if (response.ok && result.success) {
                 alert('✅ Lesson created successfully!');
                 setShowLessonForm(false);
-                // TODO: Refresh Bahagi view
+                // Refresh lessons for the current class
+                if (selectedClassId) {
+                    try {
+                        const lessonsRes = await fetch(`/api/teacher/class-lessons?classId=${selectedClassId}`);
+                        const lessonsData = await lessonsRes.json();
+                        if (lessonsData.lessons) {
+                            setClassLessons(lessonsData.lessons);
+                        }
+                    } catch (fetchErr) {
+                        console.warn('Failed to refresh lessons:', fetchErr);
+                    }
+                }
             } else {
-                alert(`❌ Error: ${response.error}`);
+                alert(`❌ Error: ${result.error || 'Failed to create lesson'}`);
             }
         } catch (err) {
             console.error('Error creating lesson:', err);
