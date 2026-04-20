@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { InteractiveSuriinPage } from './InteractiveSuriinPage';
 import { InteractivePagyamaninPage } from './InteractivePagyamaninPage';
 import { CompletionCelebration } from './CompletionCelebration';
+import { LESSON_COMPLETION_XP } from '@/lib/constants/xp-rewards';
 
 interface LessonContentViewProps {
   yunitId: string | number;
@@ -57,6 +58,8 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const yunitAudioRef = useRef<HTMLAudioElement | null>(null);
   const animationTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const completionPromiseRef = useRef<Promise<any> | null>(null);
+  const celebrationShownRef = useRef(false);
 
   const normalizeTopics = (discussion?: string) => {
     if (!discussion) {
@@ -172,6 +175,11 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
       
       // Reset interactive page state when changing yunits
       setShowInteractivePage(false);
+      setShowPagyamaninPage(false);
+      setShowCelebration(false);
+      setCompletionRewards({ xp: 0, coins: 0 });
+      completionPromiseRef.current = null;
+      celebrationShownRef.current = false;
       
       // Track that student started this lesson (create progress record if doesn't exist)
       trackLessonStart(yunitId);
@@ -223,6 +231,21 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
       console.error('[Lesson Complete] ❌ FAILED:', error);
       return null;
     }
+  };
+
+  const saveLessonCompletion = () => {
+    if (!completionPromiseRef.current) {
+      completionPromiseRef.current = markLessonComplete(yunitId);
+    }
+
+    return completionPromiseRef.current;
+  };
+
+  const applyCompletionRewards = (result: any) => {
+    setCompletionRewards({
+      xp: Number(result?.rewards?.xp) || LESSON_COMPLETION_XP,
+      coins: Number(result?.rewards?.coins) || 0,
+    });
   };
 
   // Extract plain text from discussion (handles JSON topics or legacy text)
@@ -406,18 +429,25 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
                              content?.includes('ipakilala ang iyong sarili');
 
   // Handle completion with celebration before transitioning to assessment.
-  const handleComplete = async () => {
-    try {
-      const result = await markLessonComplete(yunitId);
-      setCompletionRewards({
-        xp: Number(result?.rewards?.xp) || 0,
-        coins: Number(result?.rewards?.coins) || 0,
-      });
-      setShowCelebration(true);
-    } catch (error) {
-      console.error('[Lesson Complete] Failed to save:', error);
-      setShowCelebration(true);
+  const handleComplete = () => {
+    if (celebrationShownRef.current) {
+      return;
     }
+
+    celebrationShownRef.current = true;
+    setCompletionRewards((currentRewards) => ({
+      xp: currentRewards.xp || LESSON_COMPLETION_XP,
+      coins: currentRewards.coins || 0,
+    }));
+    setShowCelebration(true);
+
+    void saveLessonCompletion()
+      .then((result) => {
+        applyCompletionRewards(result);
+      })
+      .catch((error) => {
+        console.error('[Lesson Complete] Failed to save:', error);
+      });
   };
 
   const handleCelebrationComplete = () => {
@@ -445,7 +475,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
         onBack={() => setShowPagyamaninPage(false)}
         onNext={async () => {
           // Mark current lesson as complete
-          await markLessonComplete(yunitId);
+          const result = await saveLessonCompletion();
           
           const nextYunit = allYunits[currentIndex + 1];
           if (nextYunit) {
@@ -453,6 +483,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
             onNextYunit(nextYunit.id);
           } else {
             setShowPagyamaninPage(false);
+            applyCompletionRewards(result);
             handleComplete();
           }
         }}
@@ -469,7 +500,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
         onBack={() => setShowInteractivePage(false)}
         onNext={async () => {
           // Mark current lesson as complete
-          await markLessonComplete(yunitId);
+          const result = await saveLessonCompletion();
           
           const nextYunit = allYunits[currentIndex + 1];
           if (nextYunit) {
@@ -477,6 +508,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
             onNextYunit(nextYunit.id);
           } else {
             setShowInteractivePage(false);
+            applyCompletionRewards(result);
             handleComplete();
           }
         }}
@@ -782,7 +814,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
                     } else if (isPagyamaninLesson) {
                       setShowPagyamaninPage(true);
                     } else {
-                      await markLessonComplete(yunitId);
+                      await saveLessonCompletion();
                       const nextYunit = allYunits[currentIndex + 1];
                       if (nextYunit) {
                         onNextYunit(nextYunit.id);

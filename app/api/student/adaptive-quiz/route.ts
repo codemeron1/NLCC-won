@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { ASSESSMENT_COMPLETION_XP } from '@/lib/constants/xp-rewards';
 
 // Assign difficulty: 1=easy, 2=medium, 3=hard
 function getDifficulty(type: string): number {
@@ -160,11 +161,10 @@ export async function POST(request: NextRequest) {
         .filter(Boolean)
     )];
 
-    // Calculate XP and coins based on performance and difficulty
-    const baseXP = 10;
+    // Standardize assessment/quiz XP while preserving coin scaling.
     const baseCoins = 5;
     const difficultyMultiplier = difficultyLevel || 1;
-    const xpEarned = isPassed ? Math.round(correctCount * baseXP * difficultyMultiplier) : Math.round(correctCount * 2);
+    const xpEarned = isPassed ? ASSESSMENT_COMPLETION_XP : 0;
     const coinsEarned = isPassed ? Math.round(correctCount * baseCoins * difficultyMultiplier) : Math.round(correctCount * 1);
 
     const saveResponsesTask = Promise.allSettled(
