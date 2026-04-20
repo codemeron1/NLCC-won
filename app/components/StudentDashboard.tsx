@@ -313,7 +313,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
                 {visitedTabs.leaders && (
                     <div className={activeTab === 'leaders' ? 'w-full' : 'hidden'}>
-                        <StudentLeaderboard />
+                        <StudentLeaderboard studentId={user?.id || ''} />
                     </div>
                 )}
 
@@ -325,7 +325,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
                 {visitedTabs.store && (
                     <div className={activeTab === 'store' ? 'w-full' : 'hidden'}>
-                        <StudentShop />
+                        <StudentShop userId={user?.id || ''} />
                     </div>
                 )}
 
