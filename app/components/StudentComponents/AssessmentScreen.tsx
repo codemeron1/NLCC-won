@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '@/lib/api-client';
 import { useQuizAudio } from './useQuizAudio';
+import { ASSESSMENT_COMPLETION_XP } from '@/lib/constants/xp-rewards';
 
 interface Question {
   id?: string;
@@ -335,7 +336,19 @@ export const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
       if (result.success) {
         playCompletionSound();
-        onComplete(result);
+        const isPassed = Boolean(result.isPassed ?? result.data?.isCorrect);
+        onComplete({
+          ...result,
+          isPassed,
+          scorePercentage: result.scorePercentage ?? (isPassed ? 100 : 0),
+          xpEarned: result.xpEarned ?? (isPassed ? ASSESSMENT_COMPLETION_XP : 0),
+          coinsEarned: result.coinsEarned ?? 0,
+          message:
+            result.message ??
+            (isPassed
+              ? `🎉 Mahusay! Earned +${ASSESSMENT_COMPLETION_XP} XP.`
+              : result.data?.feedback ?? 'Subukan muli.'),
+        });
       } else {
         throw new Error(result.error || 'Failed to submit assessment');
       }

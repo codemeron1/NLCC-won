@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, memo } from 'react';
 import { motion } from 'framer-motion';
+import { LESSON_COMPLETION_XP } from '@/lib/constants/xp-rewards';
 
 interface Yunit {
   id: string | number;
@@ -191,9 +192,9 @@ const YunitViewComponent: React.FC<YunitViewProps> = ({
                         <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded-lg font-bold">
                           ✓ Completed
                         </span>
-                        {yunit.xp_earned > 0 && (
+                        {(yunit.xp_earned > 0 || yunit.completed) && (
                           <span className="text-yellow-400 font-bold">
-                            ⭐ +{yunit.xp_earned} XP
+                            ⭐ +{LESSON_COMPLETION_XP} XP
                           </span>
                         )}
                         {yunit.coins_earned > 0 && (

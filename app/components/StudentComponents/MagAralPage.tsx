@@ -391,6 +391,7 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
           yunitId={selectedYunitId}
           bahagiId={selectedBahagiId}
           studentId={studentId}
+          cachedYunits={yunitsCache[String(selectedBahagiId)]?.data}
           onComplete={handleLessonComplete}
           onNextYunit={handleNextYunit}
           onBack={goBack}
@@ -403,7 +404,7 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
           yunitId={selectedYunitId}
           bahagiId={selectedBahagiId}
           onComplete={handleAssessmentComplete}
-          onBack={goBack}
+          onBack={() => setCurrentView('yunits')}
         />
       )}
 

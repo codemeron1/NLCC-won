@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { LESSON_COMPLETION_XP } from '@/lib/constants/xp-rewards';
 
 export async function GET(request: NextRequest) {
   try {
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
         audio_url: lesson.audio_url,
         lesson_order: lesson.lesson_order,
         completed: lesson.completed,
-        xp_earned: parseInt(lesson.xp_earned),
+        xp_earned: lesson.completed ? LESSON_COMPLETION_XP : 0,
         coins_earned: parseInt(lesson.coins_earned),
         completion_date: lesson.completion_date,
         assessment_count: assessmentCount,

@@ -5,13 +5,14 @@ import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { InteractiveSuriinPage } from './InteractiveSuriinPage';
 import { InteractivePagyamaninPage } from './InteractivePagyamaninPage';
-import { LoadingAssessment } from './LoadingAssessment';
 import { CompletionCelebration } from './CompletionCelebration';
+import { LESSON_COMPLETION_XP } from '@/lib/constants/xp-rewards';
 
 interface LessonContentViewProps {
   yunitId: string | number;
   bahagiId: string | number;
   studentId: string;
+  cachedYunits?: LessonData[];
   onComplete: () => void;
   onNextYunit: (yunitId: string | number) => void;
   onBack: () => void;
@@ -34,6 +35,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
   yunitId,
   bahagiId,
   studentId,
+  cachedYunits,
   onComplete,
   onNextYunit,
   onBack
@@ -48,20 +50,79 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
   const [showCompleteButton, setShowCompleteButton] = useState(false);
   const [showInteractivePage, setShowInteractivePage] = useState(false);
   const [showPagyamaninPage, setShowPagyamaninPage] = useState(false);
-  const [showLoading, setShowLoading] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [completionRewards, setCompletionRewards] = useState({ xp: 0, coins: 0 });
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const [isYunitAudioPlaying, setIsYunitAudioPlaying] = useState(false);
   const topicAudioRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const yunitAudioRef = useRef<HTMLAudioElement | null>(null);
   const animationTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const completionPromiseRef = useRef<Promise<any> | null>(null);
+  const celebrationShownRef = useRef(false);
+
+  const normalizeTopics = (discussion?: string) => {
+    if (!discussion) {
+      return [] as { title: string; content: string; images: string[]; audio: string; quotes: { text: string; audio: string }[] }[];
+    }
+
+    try {
+      const parsed = JSON.parse(discussion);
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        return [];
+      }
+
+      return parsed.map((topic: any) => ({
+        title: topic?.title || '',
+        content: topic?.content || '',
+        images: Array.isArray(topic?.images) ? topic.images : [],
+        audio: topic?.audio || '',
+        quotes: Array.isArray(topic?.quotes)
+          ? topic.quotes.map((quote: any) =>
+              typeof quote === 'string'
+                ? { text: quote, audio: '' }
+                : { text: quote?.text || '', audio: quote?.audio || '' }
+            )
+          : [],
+      }));
+    } catch {
+      return [];
+    }
+  };
 
   // Fetch all yunits for the bahagi (once)
   useEffect(() => {
     const fetchYunits = async () => {
       try {
-        setIsLoading(true);
+        const hasCachedYunits = Boolean(cachedYunits && cachedYunits.length > 0);
+        setIsLoading(!hasCachedYunits);
+
+        if (cachedYunits && cachedYunits.length > 0) {
+          setAllYunits(cachedYunits);
+
+          const index = cachedYunits.findIndex((y: LessonData) => y.id === Number(yunitId));
+          setCurrentIndex(index >= 0 ? index : 0);
+
+          const currentYunit = cachedYunits.find((y: LessonData) => y.id === Number(yunitId));
+          if (currentYunit) {
+            setLesson({
+              ...currentYunit,
+              bahagi_icon_path: bahagiIconPath,
+            });
+          }
+
+          if (!bahagiIconPath) {
+            const firstYunit = cachedYunits[0];
+            if (firstYunit?.id) {
+              const lessonResponse = await fetch(`/api/rest/yunits/${firstYunit.id}`);
+              const lessonData = await lessonResponse.json();
+              if (lessonData.success && lessonData.data?.bahagi_icon_path) {
+                setBahagiIconPath(lessonData.data.bahagi_icon_path);
+              }
+            }
+          }
+        }
+
         console.log('[LessonContentView] Fetching yunits for bahagi:', bahagiId);
         
         const response = await fetch(`/api/student/yunits-progress?bahagiId=${bahagiId}&studentId=${studentId}`);
@@ -94,7 +155,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
     };
 
     fetchYunits();
-  }, [bahagiId, studentId]);
+  }, [bahagiId, studentId, yunitId, cachedYunits, bahagiIconPath]);
 
   // Update current lesson when yunitId changes
   useEffect(() => {
@@ -114,6 +175,11 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
       
       // Reset interactive page state when changing yunits
       setShowInteractivePage(false);
+      setShowPagyamaninPage(false);
+      setShowCelebration(false);
+      setCompletionRewards({ xp: 0, coins: 0 });
+      completionPromiseRef.current = null;
+      celebrationShownRef.current = false;
       
       // Track that student started this lesson (create progress record if doesn't exist)
       trackLessonStart(yunitId);
@@ -167,13 +233,28 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
     }
   };
 
+  const saveLessonCompletion = () => {
+    if (!completionPromiseRef.current) {
+      completionPromiseRef.current = markLessonComplete(yunitId);
+    }
+
+    return completionPromiseRef.current;
+  };
+
+  const applyCompletionRewards = (result: any) => {
+    setCompletionRewards({
+      xp: Number(result?.rewards?.xp) || LESSON_COMPLETION_XP,
+      coins: Number(result?.rewards?.coins) || 0,
+    });
+  };
+
   // Extract plain text from discussion (handles JSON topics or legacy text)
   const extractDisplayText = (discussion?: string, subtitle?: string): string => {
     if (!discussion) return subtitle || 'Welcome to this lesson!';
-    try {
-      const parsed = JSON.parse(discussion);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((t: any) => {
+
+    const topics = normalizeTopics(discussion);
+    if (topics.length > 0) {
+      return topics.map((t) => {
           let text = '';
           if (t.title) text += t.title + '\n\n';
           if (t.content) {
@@ -193,8 +274,13 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
           }
           return text;
         }).join('\n\n');
-      }
-    } catch { /* legacy plain text */ }
+    }
+
+    const trimmedDiscussion = discussion.trim();
+    if (!trimmedDiscussion || trimmedDiscussion === '[]' || trimmedDiscussion === '{}') {
+      return subtitle || 'Welcome to this lesson!';
+    }
+
     return discussion;
   };
 
@@ -318,19 +404,22 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
   // Parse discussion — could be JSON topics array or legacy plain text
   let parsedTopics: { title: string; content: string; images: string[]; audio: string; quotes: { text: string; audio: string }[] }[] = [];
   const content = extractDisplayText(lesson.discussion, lesson.subtitle);
-  try {
-    const parsed = JSON.parse(lesson.discussion || '');
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      parsedTopics = parsed.map((t: any) => ({
-        ...t,
-        quotes: (t.quotes || []).map((q: any) =>
-          typeof q === 'string' ? { text: q, audio: '' } : { text: q.text || '', audio: q.audio || '' }
-        ),
-      }));
-    }
-  } catch {
-    // Legacy plain text — use as-is
-  }
+  parsedTopics = normalizeTopics(lesson.discussion);
+  const contentLength = parsedTopics.length > 0
+    ? parsedTopics.reduce((total, topic) => total + (topic.title?.length || 0) + (topic.content?.replace(/<[^>]*>/g, '').length || 0), 0)
+    : content.length;
+  const isLongContent = contentLength > 900;
+  const isVeryLongContent = contentLength > 1800;
+  const topicBodyClass = isVeryLongContent
+    ? 'text-slate-200 text-sm leading-6 prose prose-invert prose-sm max-w-none [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-white [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_hr]:border-slate-600'
+    : isLongContent
+      ? 'text-slate-200 text-base leading-7 prose prose-invert max-w-none [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-white [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_hr]:border-slate-600'
+      : 'text-slate-200 text-lg leading-relaxed prose prose-invert prose-lg max-w-none [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-white [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_hr]:border-slate-600';
+  const plainTextClass = isVeryLongContent
+    ? 'text-slate-200 text-sm leading-6 whitespace-pre-wrap wrap-break-word'
+    : isLongContent
+      ? 'text-slate-200 text-[15px] leading-7 whitespace-pre-wrap wrap-break-word'
+      : 'text-slate-200 text-base leading-relaxed whitespace-pre-wrap wrap-break-word';
 
   // Check if this is the Suriin lesson
   const isSuriinLesson = lesson.title?.toLowerCase().includes('suriin') || lesson.subtitle?.toLowerCase().includes('suriin');
@@ -339,27 +428,26 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
   const isPagyamaninLesson = content?.includes('Upang mas lalong makilala ang iyong sarili') || 
                              content?.includes('ipakilala ang iyong sarili');
 
-  // Handle completion with loading and celebration (for final lesson)
-  const handleComplete = async () => {
-    setShowLoading(true);
-    
-    try {
-      // Mark final lesson as complete
-      await markLessonComplete(yunitId);
-      
-      // Show loading for 1.5 seconds, then show celebration
-      setTimeout(() => {
-        setShowLoading(false);
-        setShowCelebration(true);
-      }, 1500);
-    } catch (error) {
-      console.error('[Lesson Complete] Failed to save:', error);
-      // Still show celebration even if API fails
-      setTimeout(() => {
-        setShowLoading(false);
-        setShowCelebration(true);
-      }, 1500);
+  // Handle completion with celebration before transitioning to assessment.
+  const handleComplete = () => {
+    if (celebrationShownRef.current) {
+      return;
     }
+
+    celebrationShownRef.current = true;
+    setCompletionRewards((currentRewards) => ({
+      xp: currentRewards.xp || LESSON_COMPLETION_XP,
+      coins: currentRewards.coins || 0,
+    }));
+    setShowCelebration(true);
+
+    void saveLessonCompletion()
+      .then((result) => {
+        applyCompletionRewards(result);
+      })
+      .catch((error) => {
+        console.error('[Lesson Complete] Failed to save:', error);
+      });
   };
 
   const handleCelebrationComplete = () => {
@@ -367,17 +455,14 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
     onComplete();
   };
 
-  // Show loading screen
-  if (showLoading) {
-    return <LoadingAssessment />;
-  }
-
   // Show celebration screen
   if (showCelebration) {
     return (
       <CompletionCelebration
         onContinue={handleCelebrationComplete}
         message="Natapos mo na ang aralin! Magaling!"
+        xpEarned={completionRewards.xp}
+        coinsEarned={completionRewards.coins}
       />
     );
   }
@@ -390,7 +475,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
         onBack={() => setShowPagyamaninPage(false)}
         onNext={async () => {
           // Mark current lesson as complete
-          await markLessonComplete(yunitId);
+          const result = await saveLessonCompletion();
           
           const nextYunit = allYunits[currentIndex + 1];
           if (nextYunit) {
@@ -398,6 +483,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
             onNextYunit(nextYunit.id);
           } else {
             setShowPagyamaninPage(false);
+            applyCompletionRewards(result);
             handleComplete();
           }
         }}
@@ -414,7 +500,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
         onBack={() => setShowInteractivePage(false)}
         onNext={async () => {
           // Mark current lesson as complete
-          await markLessonComplete(yunitId);
+          const result = await saveLessonCompletion();
           
           const nextYunit = allYunits[currentIndex + 1];
           if (nextYunit) {
@@ -422,6 +508,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
             onNextYunit(nextYunit.id);
           } else {
             setShowInteractivePage(false);
+            applyCompletionRewards(result);
             handleComplete();
           }
         }}
@@ -430,7 +517,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
   }
 
   return (
-    <div className="relative h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8 overflow-hidden">
+    <div className="relative h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8 overflow-hidden">
       {/* Back Button */}
       <button
         onClick={onBack}
@@ -500,7 +587,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
           </div>
 
           {/* Topic Content */}
-          <div className="mb-8 space-y-8">
+          <div className="mb-8 grow space-y-8">
             {parsedTopics.length > 0 ? (
               /* Structured topic rendering */
               parsedTopics.map((topic, idx) => {
@@ -512,7 +599,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
                     )}
                     {topic.content && (
                       <div
-                        className="text-slate-200 text-lg leading-relaxed prose prose-invert prose-lg max-w-none [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-white [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_hr]:border-slate-600"
+                        className={topicBodyClass}
                         dangerouslySetInnerHTML={{ __html: topic.content }}
                       />
                     )}
@@ -566,7 +653,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
                             const q = quotes[i];
                             const qAudioId = `quote-${idx}-${i}`;
                             return (
-                              <div key={i} className="flex items-center gap-3 flex-1 min-w-[300px]">
+                              <div key={i} className="flex items-center gap-3 flex-1 min-w-75">
                                 {/* Image */}
                                 {img && (
                                   <div className="shrink-0">
@@ -632,7 +719,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
               })
             ) : (
               /* Legacy plain text with typing animation */
-              <div className="text-slate-200 text-base leading-relaxed whitespace-pre-wrap break-words">
+              <div className={plainTextClass}>
                 {displayedText}
                 {isAnimating && (
                   <motion.span
@@ -646,7 +733,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
           </div>
 
           {/* Media Content Section */}
-          <div className="space-y-4 flex-1">
+          <div className="space-y-4">
             {/* Image + Audio Row — only for legacy content */}
             {parsedTopics.length === 0 && (
               <div className="flex flex-col md:flex-row gap-4">
@@ -683,16 +770,6 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
               </div>
             )}
 
-            {/* Content Labels — only for legacy (non-topic) content */}
-            {parsedTopics.length === 0 && (lesson.media_url || lesson.audio_url) && (
-              <div className="text-slate-400 text-sm space-y-0.5">
-                <p className="font-semibold text-slate-300">Media Content:</p>
-                {lesson.media_url && <p>Image Content</p>}
-                {(lesson.discussion || lesson.subtitle) && <p>Text Content</p>}
-                {lesson.audio_url && <p>Audio Content</p>}
-              </div>
-            )}
-
             {/* Lesson Media Image — only for legacy content or explicit cover */}
             {lesson.media_url && !isPagyamaninLesson && parsedTopics.length === 0 && (
               <motion.div
@@ -712,7 +789,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
           </div>
 
           {/* Navigation Button - Inside Card Bottom */}
-          <div className="flex items-center justify-center gap-4 pt-6 mt-auto">
+          <div className="flex flex-wrap items-center justify-center gap-4 pt-8 mt-auto">
               {currentIndex > 0 && (
                 <button
                   onClick={() => {
@@ -737,7 +814,7 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
                     } else if (isPagyamaninLesson) {
                       setShowPagyamaninPage(true);
                     } else {
-                      await markLessonComplete(yunitId);
+                      await saveLessonCompletion();
                       const nextYunit = allYunits[currentIndex + 1];
                       if (nextYunit) {
                         onNextYunit(nextYunit.id);

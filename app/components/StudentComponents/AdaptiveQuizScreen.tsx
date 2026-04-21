@@ -317,9 +317,7 @@ export const AdaptiveQuizScreen: React.FC<AdaptiveQuizScreenProps> = ({
     if (correct) {
       setCorrectCount(prev => prev + 1);
       setStreak(prev => prev + 1);
-      const xpGain = Math.round(currentQuestion.xp * (difficultyLevel * 0.5 + 0.5));
       const coinGain = Math.round(currentQuestion.coins * (difficultyLevel * 0.5 + 0.5));
-      setTotalXP(prev => prev + xpGain);
       setTotalCoins(prev => prev + coinGain);
 
       // Increase difficulty after 2 correct in a row
@@ -380,6 +378,8 @@ export const AdaptiveQuizScreen: React.FC<AdaptiveQuizScreenProps> = ({
 
       const result = await res.json();
       if (result.success) {
+        setTotalXP(result.xpEarned || 0);
+        setTotalCoins(result.coinsEarned || 0);
         onComplete(result);
       }
     } catch (err: any) {

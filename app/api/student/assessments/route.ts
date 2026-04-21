@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { ASSESSMENT_COMPLETION_XP } from '@/lib/constants/xp-rewards';
 
 export async function GET(request: NextRequest) {
   try {
@@ -112,10 +113,9 @@ export async function POST(request: NextRequest) {
     let coinsEarned = 0;
 
     if (isPassed) {
+      xpEarned = ASSESSMENT_COMPLETION_XP;
       for (const reward of rewardResult.rows) {
-        if (reward.reward_type === 'xp') {
-          xpEarned = reward.amount;
-        } else if (reward.reward_type === 'coins') {
+        if (reward.reward_type === 'coins') {
           coinsEarned = reward.amount;
         }
       }
