@@ -7,11 +7,11 @@ import { query } from "@/lib/db";
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }:  { params: Promise<{ id: string }> }
 ) {
   try {
     const studentId = request.headers.get("x-student-id");
-    const missionId = params.id;
+    const missionId = await params.id;
 
     if (!studentId) {
       return NextResponse.json(
@@ -129,11 +129,11 @@ export async function POST(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }:  { params: Promise<{ id: string }> }
 ) {
   try {
     const studentId = request.headers.get("x-student-id");
-    const missionId = params.id;
+    const missionId = await params.id;
 
     if (!studentId || !missionId) {
       return NextResponse.json(
