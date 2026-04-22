@@ -3,6 +3,8 @@
  * Helper functions and guidelines for WCAG 2.1 compliance
  */
 
+import React from 'react';
+
 /**
  * Common ARIA labels and roles for components
  */
