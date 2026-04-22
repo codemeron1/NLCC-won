@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "migrate:assessment": "node scripts/migrate-assessment-schema.mjs",
-    "check:assessment": "node check_assessment_table.mjs"
+    "check:assessment": "node check_assessment_table.mjs",
+    "migrate:storage": "node add_storage_optimization_columns.mjs",
+    "audit:storage": "node -e \"fetch('http://localhost:3000/api/storage/cleanup?details=true').then(r=>r.json()).then(console.log)\""
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

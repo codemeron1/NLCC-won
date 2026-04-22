@@ -57,11 +57,12 @@ export async function POST(req: NextRequest) {
         const ext = file.name.split('.').pop();
         const fileName = `${fileType}/${timestamp}-${Math.random().toString(36).substr(2, 9)}.${ext}`;
 
-        // Upload to Supabase Storage
+        // Upload to Supabase Storage with cache headers for CDN
         const { data, error } = await supabase.storage
             .from(bucketName)
             .upload(fileName, buffer, {
                 contentType: file.type,
+                cacheControl: '31536000', // Cache for 1 year (in seconds)
                 upsert: false
             });
 
