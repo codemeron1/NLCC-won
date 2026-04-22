@@ -365,6 +365,8 @@ class AssessmentAPI extends APIClient {
   async update(
     assessmentId: number,
     data: Partial<{
+      yunit_id: number;
+      bahagi_id: number;
       title: string;
       description: string;
       instructions: string;
@@ -1067,7 +1069,7 @@ class StudentService extends APIClient {
    * Get student missions
    */
   async getMissions(): Promise<APIResponse> {
-    return this.getWithStudentId(`/missions`);
+    return this.getWithStudentId(`/missions?_t=${Date.now()}`);
   }
 
   /**

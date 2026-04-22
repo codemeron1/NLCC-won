@@ -423,6 +423,9 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
     // Handle creating assessment
     const handleCreateAssessment = (bahagiObj: any) => {
         setSelectedBahagiForAssessment(bahagiObj);
+        if (!bahagiYunits[bahagiObj.id]) {
+            fetchYunitsForBahagi(bahagiObj.id);
+        }
         setShowAssessmentForm(true);
     };
 
@@ -438,7 +441,7 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
             const assessmentType = data.questions?.[0]?.type || data.type || 'multiple-choice';
 
             const response = await apiClient.assessment.create({
-                yunit_id: data.lessonId || 0,
+                yunit_id: data.yunitId || data.lessonId || 0,
                 bahagi_id: data.bahagiId || 0,
                 title: data.title,
                 description: data.instructions,
@@ -707,10 +710,10 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
     // Handle toggling publish status
     const handleTogglePublish = async (bahagiId: number, currentStatus: boolean) => {
         try {
-            const result = await apiClient.bahagi.publish(bahagiId);
+            const result = await apiClient.bahagi.update(bahagiId, { isPublished: !currentStatus } as any);
             if (result.success) {
-                alert(`✅ Bahagi published!`);
-                onRefreshBahagi?.();
+                alert(`✅ Bahagi ${currentStatus ? 'unpublished' : 'published'}!`);
+                await onRefreshBahagi?.();
             } else {
                 alert(`❌ Error: ${result.error || 'Failed to update'}`);
             }
@@ -891,6 +894,213 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
         setSelectedModule(null);
         setSearchTerm('');
     };
+
+    const selectionCategoryBahagi = filteredBahagi.filter(
+        (b) => Boolean(b.is_published) && !Boolean(b.is_archived)
+    );
+    const uncategorizedBahagi = filteredBahagi.filter(
+        (b) => !Boolean(b.is_published) && !Boolean(b.is_archived)
+    );
+    const archivedBahagi = filteredBahagi.filter((b) => Boolean(b.is_archived));
+
+    const renderBahagiCard = (b: any) => (
+        <div
+            key={b.id}
+            draggable
+            onDragStart={() => handleBahagiDragStart(b.id)}
+            onDragOver={(e) => handleBahagiDragOver(e, b.id)}
+            onDrop={(e) => handleBahagiDrop(e, b.id)}
+            onDragEnd={handleBahagiDragEnd}
+            className={`transition-all ${
+                draggedBahagiId === b.id ? 'opacity-50 scale-95' : ''
+            } ${
+                draggedOverBahagiId === b.id && draggedBahagiId !== b.id ? 'border-2 border-brand-purple rounded-xl' : ''
+            }`}
+        >
+            <EnhancedBahagiCardV2
+                id={b.id}
+                title={b.title}
+                description={b.description}
+                quarter={b.quarter}
+                week_number={b.week_number}
+                module_number={b.module_number}
+                iconPath={b.icon_path}
+                iconType={b.icon_type}
+                isArchived={b.is_archived}
+                isPublished={Boolean(b.is_published)}
+                lessonCount={b.lessonCount || 0}
+                assessmentCount={
+                    Array.isArray(bahagiAssessments[b.id])
+                        ? bahagiAssessments[b.id].length
+                        : (b.assessmentCount || 0)
+                }
+                expanded={expandedBahagiId === b.id}
+                onToggleExpand={() => handleToggleBahagiExpand(b.id)}
+                onEdit={() => handleEditBahagi(b.id)}
+                onTogglePublish={() => handleTogglePublish(b.id, Boolean(b.is_published))}
+                onArchive={() => handleArchiveBahagi(b.id)}
+                onDelete={() => handleDeleteBahagi(b.id)}
+                onAddYunit={() => handleCreateYunit(b)}
+                onAddAssessment={() => handleCreateAssessment(b)}
+                userId={teacherId || ''}
+                isDraggable={true}
+            />
+
+            {/* Yunits and Assessments Section */}
+            {expandedBahagiId === b.id && (
+                <div className="mt-4 space-y-4 ml-4 pl-4 border-l-2 border-brand-purple/30">
+                    {/* Yunits */}
+                    <div>
+                        <div className="flex items-center justify-between mb-3">
+                            <h5 className="text-lg font-black text-white">📖 Yunits</h5>
+                            <span className="text-xs font-black text-slate-500 bg-slate-900 px-3 py-1 rounded">
+                                {bahagiYunits[b.id]?.length || 0}
+                            </span>
+                        </div>
+                        {(() => {
+                            console.log(`[Yunits Render] Checking bahagi ${b.id}:`, {
+                                isLoadingYunits,
+                                'bahagiYunits[b.id]': bahagiYunits[b.id],
+                                'bahagiYunits[b.id]?.length': bahagiYunits[b.id]?.length,
+                                'expandedBahagiId': expandedBahagiId,
+                                'b.id === expandedBahagiId': b.id === expandedBahagiId
+                            });
+                            return null;
+                        })()}
+                        {isLoadingYunits ? (
+                            <p className="text-slate-500 text-sm">Loading yunits...</p>
+                        ) : bahagiYunits[b.id]?.length > 0 ? (
+                            <div className="space-y-2">
+                                {bahagiYunits[b.id].map((yunit: any) => (
+                                    <div
+                                        key={yunit.id}
+                                        draggable
+                                        onDragStart={() => handleYunitDragStart(yunit.id)}
+                                        onDragOver={(e) => handleYunitDragOver(e, yunit.id)}
+                                        onDrop={(e) => handleYunitDrop(e, yunit.id, b.id)}
+                                        onDragEnd={handleYunitDragEnd}
+                                        className={`bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 flex items-start justify-between cursor-move transition-all ${
+                                            draggedYunitId === yunit.id ? 'opacity-50 scale-95' : ''
+                                        } ${
+                                            draggedOverYunitId === yunit.id && draggedYunitId !== yunit.id ? 'border-brand-purple border-2' : ''
+                                        }`}
+                                    >
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-slate-600 cursor-grab active:cursor-grabbing">⋮⋮</span>
+                                                <p className="text-sm font-bold text-white">{yunit.title}</p>
+                                            </div>
+                                            {/* Quarter, Week, Module Info */}
+                                            {(yunit.quarter || yunit.week_number || yunit.module_number) && (
+                                                <div className="flex items-center gap-2 mt-1 ml-6">
+                                                    {yunit.quarter && (
+                                                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-indigo-900/30 text-indigo-400">
+                                                            {yunit.quarter} Q
+                                                        </span>
+                                                    )}
+                                                    {yunit.week_number && (
+                                                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-cyan-900/30 text-cyan-400">
+                                                            Week {yunit.week_number}
+                                                        </span>
+                                                    )}
+                                                    {yunit.module_number && (
+                                                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-purple-900/30 text-purple-400">
+                                                            {yunit.module_number}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <p className="text-xs text-slate-400 mt-1 ml-6">{yunit.subtitle}</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                className="px-2 py-1 text-xs bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 rounded transition-all"
+                                                onClick={() => handleEditYunit(yunit)}
+                                                title="Edit Yunit"
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                            >
+                                                ✏️
+                                            </button>
+                                            <button
+                                                className="px-2 py-1 text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded transition-all"
+                                                onClick={async () => {
+                                                    if (confirm('Delete this Yunit?')) {
+                                                        await handleDeleteYunitInline(yunit.id, b.id);
+                                                    }
+                                                }}
+                                                title="Delete Yunit"
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                            >
+                                                🗑️
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-slate-600 italic">No yunits yet</p>
+                        )}
+                    </div>
+
+                    {/* Assessments */}
+                    <div className="border-t border-slate-700/50 pt-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <h5 className="text-lg font-black text-white">⭐ Assessments</h5>
+                            <span className="text-xs font-black text-slate-500 bg-slate-900 px-3 py-1 rounded">
+                                {bahagiAssessments[b.id]?.length || 0}
+                            </span>
+                        </div>
+                        {isLoadingAssessments ? (
+                            <p className="text-slate-500 text-sm">Loading assessments...</p>
+                        ) : bahagiAssessments[b.id]?.length > 0 ? (
+                            <div className="space-y-2">
+                                {bahagiAssessments[b.id].map((assessment: any) => (
+                                    <div
+                                        key={assessment.id}
+                                        className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 flex items-start justify-between"
+                                    >
+                                        <div className="flex-1">
+                                            <p className="text-sm font-bold text-white">{assessment.title}</p>
+                                            <div className="flex gap-2 mt-2">
+                                                <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-slate-700/50 text-slate-300">
+                                                    {assessment.type}
+                                                </span>
+                                                <span className="text-[9px] font-black text-brand-sky">
+                                                    ⭐ {assessment.points} pts
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                className="px-2 py-1 text-xs bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 rounded transition-all"
+                                                onClick={() => handleEditAssessment(assessment)}
+                                                title="Edit Assessment"
+                                            >
+                                                ✏️
+                                            </button>
+                                            <button
+                                                className="px-2 py-1 text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded transition-all"
+                                                onClick={async () => {
+                                                    if (confirm('Delete this Assessment?')) {
+                                                        await handleDeleteAssessmentInline(assessment.id, b.id);
+                                                    }
+                                                }}
+                                                title="Delete Assessment"
+                                            >
+                                                🗑️
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-slate-600 italic">No assessments yet</p>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 
     return (
         <div className="flex flex-col gap-8 animate-in fade-in duration-700">
@@ -1188,223 +1398,62 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
                     </div>
                 ) : filteredBahagi.length > 0 ? (
                     <div className="space-y-6">
-                        {orderedQuarters.map((quarter) => (
-                            <div key={quarter} className="space-y-4">
-                                {/* Quarter Header */}
-                                <button
-                                    onClick={() => toggleQuarterCollapse(quarter)}
-                                    className="w-full flex items-center gap-3 hover:bg-slate-800/30 rounded-lg p-3 -m-3 transition-all group"
-                                >
-                                    <div className="h-0.5 shrink-0 w-12 bg-linear-to-r from-brand-purple to-transparent"></div>
-                                    <h3 className="text-lg font-black text-white uppercase tracking-wide">
-                                        {quarter === 'No Quarter' ? 'Uncategorized' : quarter}
-                                    </h3>
-                                    <div className="h-0.5 flex-1 bg-linear-to-r from-brand-purple/50 to-transparent"></div>
-                                    <span className="text-xs font-black text-slate-500 bg-slate-900 px-3 py-1 rounded">
-                                        {bahagiByQuarter[quarter].length} {bahagiByQuarter[quarter].length === 1 ? 'bahagi' : 'bahagi'}
-                                    </span>
-                                    <div className="text-2xl text-slate-500 group-hover:text-brand-purple transition-colors">
-                                        {collapsedQuarters.has(quarter) ? '▶' : '▼'}
-                                    </div>
-                                </button>
-
-                                {/* Bahagi Cards for this Quarter */}
-                                {!collapsedQuarters.has(quarter) && bahagiByQuarter[quarter].map((b) => (
-                                    <div 
-                                        key={b.id}
-                                        draggable
-                                        onDragStart={() => handleBahagiDragStart(b.id)}
-                                        onDragOver={(e) => handleBahagiDragOver(e, b.id)}
-                                        onDrop={(e) => handleBahagiDrop(e, b.id)}
-                                        onDragEnd={handleBahagiDragEnd}
-                                        className={`transition-all ${
-                                            draggedBahagiId === b.id ? 'opacity-50 scale-95' : ''
-                                        } ${
-                                            draggedOverBahagiId === b.id && draggedBahagiId !== b.id ? 'border-2 border-brand-purple rounded-xl' : ''
-                                        }`}
-                                    >
-                                <EnhancedBahagiCardV2
-                                    id={b.id}
-                                    title={b.title}
-                                    description={b.description}
-                                    quarter={b.quarter}
-                                    week_number={b.week_number}
-                                    module_number={b.module_number}
-                                    iconPath={b.icon_path}
-                                    iconType={b.icon_type}
-                                    isArchived={b.is_archived}
-                                    lessonCount={b.lessonCount || 0}
-                                    assessmentCount={b.assessmentCount || 0}
-                                    expanded={expandedBahagiId === b.id}
-                                    onToggleExpand={() => handleToggleBahagiExpand(b.id)}
-                                    onEdit={() => handleEditBahagi(b.id)}
-                                    onArchive={() => handleArchiveBahagi(b.id)}
-                                    onDelete={() => handleDeleteBahagi(b.id)}
-                                    onAddYunit={() => handleCreateYunit(b)}
-                                    userId={teacherId || ''}
-                                    isDraggable={true}
-                                />
-                                
-                                {/* Yunits and Assessments Section */}
-                                {expandedBahagiId === b.id && (
-                                    <div className="mt-4 space-y-4 ml-4 pl-4 border-l-2 border-brand-purple/30">
-                                        {/* Yunits */}
-                                        <div>
-                                            <div className="flex items-center justify-between mb-3">
-                                                <h5 className="text-lg font-black text-white">📖 Yunits</h5>
-                                                <span className="text-xs font-black text-slate-500 bg-slate-900 px-3 py-1 rounded">
-                                                    {bahagiYunits[b.id]?.length || 0}
-                                                </span>
-                                            </div>
-                                            {(() => {
-                                                console.log(`[Yunits Render] Checking bahagi ${b.id}:`, {
-                                                    isLoadingYunits,
-                                                    'bahagiYunits[b.id]': bahagiYunits[b.id],
-                                                    'bahagiYunits[b.id]?.length': bahagiYunits[b.id]?.length,
-                                                    'expandedBahagiId': expandedBahagiId,
-                                                    'b.id === expandedBahagiId': b.id === expandedBahagiId
-                                                });
-                                                return null;
-                                            })()}
-                                            {isLoadingYunits ? (
-                                                <p className="text-slate-500 text-sm">Loading yunits...</p>
-                                            ) : bahagiYunits[b.id]?.length > 0 ? (
-                                                <div className="space-y-2">
-                                                    {bahagiYunits[b.id].map((yunit: any) => (
-                                                        <div
-                                                            key={yunit.id}
-                                                            draggable
-                                                            onDragStart={() => handleYunitDragStart(yunit.id)}
-                                                            onDragOver={(e) => handleYunitDragOver(e, yunit.id)}
-                                                            onDrop={(e) => handleYunitDrop(e, yunit.id, b.id)}
-                                                            onDragEnd={handleYunitDragEnd}
-                                                            className={`bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 flex items-start justify-between cursor-move transition-all ${
-                                                                draggedYunitId === yunit.id ? 'opacity-50 scale-95' : ''
-                                                            } ${
-                                                                draggedOverYunitId === yunit.id && draggedYunitId !== yunit.id ? 'border-brand-purple border-2' : ''
-                                                            }`}
-                                                        >
-                                                            <div className="flex-1">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-slate-600 cursor-grab active:cursor-grabbing">⋮⋮</span>
-                                                                    <p className="text-sm font-bold text-white">{yunit.title}</p>
-                                                                </div>
-                                                                {/* Quarter, Week, Module Info */}
-                                                                {(yunit.quarter || yunit.week_number || yunit.module_number) && (
-                                                                    <div className="flex items-center gap-2 mt-1 ml-6">
-                                                                        {yunit.quarter && (
-                                                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-indigo-900/30 text-indigo-400">
-                                                                                {yunit.quarter} Q
-                                                                            </span>
-                                                                        )}
-                                                                        {yunit.week_number && (
-                                                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-cyan-900/30 text-cyan-400">
-                                                                                Week {yunit.week_number}
-                                                                            </span>
-                                                                        )}
-                                                                        {yunit.module_number && (
-                                                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-purple-900/30 text-purple-400">
-                                                                                {yunit.module_number}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                                <p className="text-xs text-slate-400 mt-1 ml-6">{yunit.subtitle}</p>
-                                                            </div>
-                                                            <div className="flex gap-2">
-                                                                <button
-                                                                    className="px-2 py-1 text-xs bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 rounded transition-all"
-                                                                    onClick={() => handleEditYunit(yunit)}
-                                                                    title="Edit Yunit"
-                                                                    onMouseDown={(e) => e.stopPropagation()}
-                                                                >
-                                                                    ✏️
-                                                                </button>
-                                                                <button
-                                                                    className="px-2 py-1 text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded transition-all"
-                                                                    onClick={async () => {
-                                                                        if (confirm('Delete this Yunit?')) {
-                                                                            await handleDeleteYunitInline(yunit.id, b.id);
-                                                                        }
-                                                                    }}
-                                                                    title="Delete Yunit"
-                                                                    onMouseDown={(e) => e.stopPropagation()}
-                                                                >
-                                                                    🗑️
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="text-xs text-slate-600 italic">No yunits yet</p>
-                                            )}
-                                        </div>
-
-                                        {/* Assessments */}
-                                        <div className="border-t border-slate-700/50 pt-4">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <h5 className="text-lg font-black text-white">⭐ Assessments</h5>
-                                                <span className="text-xs font-black text-slate-500 bg-slate-900 px-3 py-1 rounded">
-                                                    {bahagiAssessments[b.id]?.length || 0}
-                                                </span>
-                                            </div>
-                                            {isLoadingAssessments ? (
-                                                <p className="text-slate-500 text-sm">Loading assessments...</p>
-                                            ) : bahagiAssessments[b.id]?.length > 0 ? (
-                                                <div className="space-y-2">
-                                                    {bahagiAssessments[b.id].map((assessment: any) => (
-                                                        <div
-                                                            key={assessment.id}
-                                                            className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 flex items-start justify-between"
-                                                        >
-                                                            <div className="flex-1">
-                                                                <p className="text-sm font-bold text-white">{assessment.title}</p>
-                                                                <div className="flex gap-2 mt-2">
-                                                                    <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-slate-700/50 text-slate-300">
-                                                                        {assessment.type}
-                                                                    </span>
-                                                                    <span className="text-[9px] font-black text-brand-sky">
-                                                                        ⭐ {assessment.points} pts
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex gap-2">
-                                                                <button
-                                                                    className="px-2 py-1 text-xs bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 rounded transition-all"
-                                                                    onClick={() => handleEditAssessment(assessment)}
-                                                                    title="Edit Assessment"
-                                                                >
-                                                                    ✏️
-                                                                </button>
-                                                                <button
-                                                                    className="px-2 py-1 text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded transition-all"
-                                                                    onClick={async () => {
-                                                                        if (confirm('Delete this Assessment?')) {
-                                                                            await handleDeleteAssessmentInline(assessment.id, b.id);
-                                                                        }
-                                                                    }}
-                                                                    title="Delete Assessment"
-                                                                >
-                                                                    🗑️
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="text-xs text-slate-600 italic">No assessments yet</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+                        <div className="space-y-4">
+                            <div className="w-full flex items-center gap-3 rounded-lg p-3 -m-3">
+                                <div className="h-0.5 shrink-0 w-12 bg-linear-to-r from-emerald-400 to-transparent"></div>
+                                <h3 className="text-lg font-black text-white uppercase tracking-wide">Selection Category</h3>
+                                <div className="h-0.5 flex-1 bg-linear-to-r from-emerald-400/50 to-transparent"></div>
+                                <span className="text-xs font-black text-emerald-300 bg-emerald-950/40 px-3 py-1 rounded border border-emerald-500/20">
+                                    {selectionCategoryBahagi.length} Published
+                                </span>
                             </div>
-                        ))}
+                            {selectionCategoryBahagi.length > 0 ? (
+                                <div className="space-y-4">
+                                    {selectionCategoryBahagi.map((b) => renderBahagiCard(b))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-500 italic">No published Bahagi in Selection Category.</p>
+                            )}
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="w-full flex items-center gap-3 rounded-lg p-3 -m-3">
+                                <div className="h-0.5 shrink-0 w-12 bg-linear-to-r from-amber-400 to-transparent"></div>
+                                <h3 className="text-lg font-black text-white uppercase tracking-wide">Uncategorized</h3>
+                                <div className="h-0.5 flex-1 bg-linear-to-r from-amber-400/50 to-transparent"></div>
+                                <span className="text-xs font-black text-amber-300 bg-amber-950/40 px-3 py-1 rounded border border-amber-500/20">
+                                    {uncategorizedBahagi.length} Draft
+                                </span>
+                            </div>
+                            {uncategorizedBahagi.length > 0 ? (
+                                <div className="space-y-4">
+                                    {uncategorizedBahagi.map((b) => renderBahagiCard(b))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-500 italic">No draft Bahagi in Uncategorized.</p>
+                            )}
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="w-full flex items-center gap-3 rounded-lg p-3 -m-3">
+                                <div className="h-0.5 shrink-0 w-12 bg-linear-to-r from-rose-400 to-transparent"></div>
+                                <h3 className="text-lg font-black text-white uppercase tracking-wide">Archive</h3>
+                                <div className="h-0.5 flex-1 bg-linear-to-r from-rose-400/50 to-transparent"></div>
+                                <span className="text-xs font-black text-rose-300 bg-rose-950/40 px-3 py-1 rounded border border-rose-500/20">
+                                    {archivedBahagi.length} Archived
+                                </span>
+                            </div>
+                            {archivedBahagi.length > 0 ? (
+                                <div className="space-y-4">
+                                    {archivedBahagi.map((b) => renderBahagiCard(b))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-500 italic">No archived Bahagi in Archive section.</p>
+                            )}
+                        </div>
                     </div>
-                ))}
-            </div>
-        ) : bahagi.length > 0 ? (
-            <div className="text-center py-12">
+                ) : bahagi.length > 0 ? (
+                    <div className="text-center py-12">
                         <div className="text-5xl mb-4">🔍</div>
                         <p className="text-slate-400 font-bold mb-2">No bahagi match your filters</p>
                         <button
@@ -1441,6 +1490,7 @@ export const ClassDetailPage: React.FC<ClassDetailPageProps> = ({
                 onSubmit={handleAssessmentSubmit}
                 bahagiId={selectedBahagiForAssessment?.id || 0}
                 bahagiTitle={selectedBahagiForAssessment?.title || ''}
+                availableYunits={bahagiYunits[selectedBahagiForAssessment?.id || 0] || []}
                 isLoading={isCreatingAssessment}
             />
 

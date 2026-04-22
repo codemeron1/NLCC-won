@@ -6,21 +6,27 @@ import { motion } from 'framer-motion';
 interface RewardModalProps {
   isOpen: boolean;
   isPassed: boolean;
+  isRetake?: boolean;
   scorePercentage: number;
   xpEarned: number;
   coinsEarned: number;
   message: string;
-  onClose: () => void;
+  continueLabel?: string;
+  onClaimRewards?: () => void;
+  onContinue: () => void;
 }
 
 export const RewardModal: React.FC<RewardModalProps> = ({
   isOpen,
   isPassed,
+  isRetake = false,
   scorePercentage,
   xpEarned,
   coinsEarned,
   message,
-  onClose
+  continueLabel = 'Magpatuloy',
+  onClaimRewards,
+  onContinue
 }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -90,7 +96,7 @@ export const RewardModal: React.FC<RewardModalProps> = ({
         {/* Title */}
         <div>
           <h2 className={`text-3xl font-black ${isPassed ? 'text-green-300' : 'text-orange-300'}`}>
-            {isPassed ? 'Excellent Work!' : 'Good Effort!'}
+            {isPassed ? (isRetake ? 'Natapos Mong Muli' : 'Excellent Work!') : 'Good Effort!'}
           </h2>
           <p className="text-slate-300 mt-2">{message}</p>
         </div>
@@ -119,7 +125,7 @@ export const RewardModal: React.FC<RewardModalProps> = ({
         </div>
 
         {/* Rewards */}
-        {isPassed && (
+        {isPassed && !isRetake && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -140,17 +146,36 @@ export const RewardModal: React.FC<RewardModalProps> = ({
           </motion.div>
         )}
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className={`w-full py-3 rounded-lg font-bold text-white transition-all ${
-            isPassed
-              ? 'bg-green-600 hover:bg-green-700'
-              : 'bg-orange-600 hover:bg-orange-700'
-          }`}
-        >
-          {isPassed ? '✨ Continue' : '🔄 Try Again'}
-        </button>
+        {isPassed ? (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-400">
+              {isRetake
+                ? 'Practice retake ito. Wala nang bagong XP o coins, pero naitala ang panibagong pagsubok mo.'
+                : 'Kunin ang iyong gantimpala para makita ang progreso ng iyong mga misyon, o magpatuloy agad sa susunod na Yunit.'}
+            </p>
+            {!isRetake && (
+              <button
+                onClick={onClaimRewards}
+                className="w-full py-3 rounded-lg font-bold text-slate-950 bg-yellow-400 hover:bg-yellow-300 transition-all"
+              >
+                Kunin
+              </button>
+            )}
+            <button
+              onClick={onContinue}
+              className="w-full py-3 rounded-lg font-bold text-white bg-green-600 hover:bg-green-700 transition-all"
+            >
+              {continueLabel}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onContinue}
+            className="w-full py-3 rounded-lg font-bold text-white bg-orange-600 hover:bg-orange-700 transition-all"
+          >
+            🔄 Try Again
+          </button>
+        )}
       </motion.div>
     </div>
   );

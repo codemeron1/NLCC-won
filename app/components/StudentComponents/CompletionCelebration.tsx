@@ -11,6 +11,7 @@ const SUCCESS_AUDIO_COOLDOWN_MS = 1200;
 interface CompletionCelebrationProps {
   onContinue: () => void;
   message?: string;
+  nextStepLabel?: string;
   xpEarned?: number;
   coinsEarned?: number;
 }
@@ -18,6 +19,7 @@ interface CompletionCelebrationProps {
 export const CompletionCelebration: React.FC<CompletionCelebrationProps> = ({
   onContinue,
   message = "Mahusay! Natapos mo na ang aralin!",
+  nextStepLabel = 'Magpatuloy',
   xpEarned = 0,
   coinsEarned = 0,
 }) => {
@@ -147,7 +149,7 @@ export const CompletionCelebration: React.FC<CompletionCelebrationProps> = ({
           onClick={onContinue}
           className="px-8 py-4 bg-linear-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-2xl font-black text-xl shadow-2xl transition-all hover:scale-105"
         >
-          Magpatuloy
+          {nextStepLabel}
         </motion.button>
       </motion.div>
     </div>

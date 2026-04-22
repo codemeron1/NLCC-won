@@ -232,16 +232,37 @@ export const EditAssessmentV2Form: React.FC<EditAssessmentV2FormProps> = ({
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [availableBahagis, setAvailableBahagis] = useState<any[]>([]);
+    const [availableYunits, setAvailableYunits] = useState<any[]>([]);
+    const [selectedBahagiId, setSelectedBahagiId] = useState<string>('');
+    const [selectedYunitId, setSelectedYunitId] = useState<string>('');
 
     const applyAssessmentToForm = (assessment: any) => {
         setTitle(assessment?.title || '');
         setInstructions(assessment?.instructions || assessment?.description || '');
+        setSelectedBahagiId(assessment?.bahagi_id ? String(assessment.bahagi_id) : '');
+        setSelectedYunitId(assessment?.lesson_id ? String(assessment.lesson_id) : '');
         setQuestions(
             Array.isArray(assessment?.questions) && assessment.questions.length > 0
                 ? assessment.questions.map((question: any) => normalizeQuestion(question, assessment.points))
                 : [defaultQuestion()]
         );
     };
+
+    useEffect(() => {
+        const loadBahagis = async () => {
+            try {
+                const response = await apiClient.bahagi.fetchAll(userId);
+                if (response?.success && Array.isArray(response.data)) {
+                    setAvailableBahagis(response.data);
+                }
+            } catch (err) {
+                console.error('Error loading bahagi options:', err);
+            }
+        };
+
+        loadBahagis();
+    }, [userId]);
 
     useEffect(() => {
         const loadAssessment = async () => {
@@ -271,6 +292,46 @@ export const EditAssessmentV2Form: React.FC<EditAssessmentV2FormProps> = ({
 
         loadAssessment();
     }, [assessmentId, userId, initialAssessment]);
+
+    useEffect(() => {
+        if (!availableBahagis.length) {
+            return;
+        }
+
+        const loadAllYunits = async () => {
+            try {
+                const responses = await Promise.all(
+                    availableBahagis.map(async (bahagi) => {
+                        const response = await apiClient.yunit.fetchByBahagi(Number(bahagi.id));
+                        const yunits = response?.success && Array.isArray(response.data) ? response.data : [];
+                        return yunits.map((yunit: any) => ({
+                            ...yunit,
+                            bahagi_id: yunit?.bahagi_id || bahagi.id,
+                            bahagiTitle: bahagi.title,
+                            week_number: yunit?.week_number || bahagi.week_number || null,
+                        }));
+                    })
+                );
+
+                const flattened = responses.flat();
+                setAvailableYunits(flattened);
+
+                if (selectedYunitId) {
+                    const selectedYunit = flattened.find((yunit: any) => String(yunit.id) === selectedYunitId);
+                    if (selectedYunit?.bahagi_id) {
+                        setSelectedBahagiId(String(selectedYunit.bahagi_id));
+                    }
+                }
+            } catch (err) {
+                console.error('Error loading yunit options:', err);
+                setAvailableYunits([]);
+            }
+        };
+
+        loadAllYunits();
+    }, [availableBahagis, selectedYunitId]);
+
+    const selectedBahagi = availableBahagis.find((bahagi) => String(bahagi.id) === selectedBahagiId);
 
     const handleAddQuestion = () => {
         setQuestions((prev) => [...prev, defaultQuestion()]);
@@ -322,6 +383,16 @@ export const EditAssessmentV2Form: React.FC<EditAssessmentV2FormProps> = ({
             return;
         }
 
+        if (!selectedBahagiId) {
+            setError('Please select the Bahagi for this assessment');
+            return;
+        }
+
+        if (!selectedYunitId) {
+            setError('Please select the Yunit for this assessment');
+            return;
+        }
+
         setSaving(true);
         setError('');
 
@@ -330,6 +401,8 @@ export const EditAssessmentV2Form: React.FC<EditAssessmentV2FormProps> = ({
             const totalPoints = normalizedQuestions.reduce((sum, question) => sum + (Number(question.xp) || 0), 0);
 
             const response = await apiClient.assessment.update(Number(assessmentId), {
+                bahagi_id: Number(selectedBahagiId),
+                yunit_id: Number(selectedYunitId),
                 title,
                 description: instructions,
                 instructions,
@@ -376,6 +449,41 @@ export const EditAssessmentV2Form: React.FC<EditAssessmentV2FormProps> = ({
 
                     <div className="space-y-4">
                         <h3 className="text-lg font-black text-white">Assessment Details</h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Bahagi</label>
+                                <input
+                                    type="text"
+                                    value={selectedBahagi?.title || ''}
+                                    readOnly
+                                    className="bg-slate-950 border border-slate-800 text-slate-300 px-5 py-4 rounded-xl text-sm"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Yunit</label>
+                                <select
+                                    value={selectedYunitId}
+                                    onChange={(e) => {
+                                        const nextYunitId = e.target.value;
+                                        setSelectedYunitId(nextYunitId);
+                                        const nextYunit = availableYunits.find((yunit) => String(yunit.id) === nextYunitId);
+                                        if (nextYunit?.bahagi_id) {
+                                            setSelectedBahagiId(String(nextYunit.bahagi_id));
+                                        }
+                                    }}
+                                    className="bg-slate-950 border border-slate-800 text-white px-5 py-4 rounded-xl text-sm focus:border-brand-purple outline-none transition-all"
+                                >
+                                    <option value="">Select Yunit</option>
+                                    {availableYunits.map((yunit) => (
+                                        <option key={yunit.id} value={String(yunit.id)}>
+                                            {`Week ${yunit.week_number || '-'} • ${yunit.bahagiTitle || selectedBahagi?.title || 'Bahagi'} • ${yunit.title}`}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
 
                         <div className="flex flex-col gap-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Assessment Title</label>

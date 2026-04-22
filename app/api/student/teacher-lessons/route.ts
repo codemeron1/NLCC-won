@@ -36,9 +36,25 @@ export async function GET(request: NextRequest) {
     const studentClassName = studentResult.rows[0].class_name;
     console.log('[GET /api/student/teacher-lessons] Student class_name:', studentClassName);
 
-    // Fetch all bahagis (parts/lessons) from the teacher
-    // Filter by student's grade level (class_name) if available
-    // Only show published and non-archived bahagi
+    const columnCheck = await query(
+      `SELECT
+         EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_name = 'bahagi' AND column_name = 'is_published'
+         ) AS has_is_published,
+         EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_name = 'bahagi' AND column_name = 'is_archived'
+         ) AS has_is_archived`
+    );
+
+    const hasIsPublished = Boolean(columnCheck.rows?.[0]?.has_is_published);
+    const hasIsArchived = Boolean(columnCheck.rows?.[0]?.has_is_archived);
+    const publishedColumn = hasIsPublished ? 'b.is_published' : 'b.is_open';
+    const archivedFilter = hasIsArchived ? 'AND COALESCE(b.is_archived, false) = false' : '';
+
+    // Fetch all bahagis (parts/lessons) from the teacher.
+    // Students must only see published, non-archived bahagis.
     let bahagiQuery = `
       SELECT 
         b.id,
@@ -55,7 +71,8 @@ export async function GET(request: NextRequest) {
       FROM bahagi b
       LEFT JOIN lesson l ON b.id = l.bahagi_id
       WHERE b.teacher_id = $1 
-        AND b.is_open = true
+        ${archivedFilter}
+        AND COALESCE(${publishedColumn}, false) = true
     `;
     
     const queryParams = [teacherId];

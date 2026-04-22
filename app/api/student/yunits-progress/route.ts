@@ -38,9 +38,13 @@ export async function GET(request: NextRequest) {
         COALESCE(lp.completed, false) as completed,
         COALESCE(lp.xp_earned, 0) as xp_earned,
         COALESCE(lp.coins_earned, 0) as coins_earned,
-        lp.completion_date
+        lp.completion_date,
+        COALESCE(sp.is_passed, false) as assessment_passed,
+        COALESCE(sp.attempts, 0) as assessment_attempts,
+        CASE WHEN sp.yunit_id IS NOT NULL THEN true ELSE false END as assessment_answered
        FROM lesson l
        LEFT JOIN lesson_progress lp ON l.id = lp.lesson_id AND lp.student_id = $2
+       LEFT JOIN student_progress sp ON l.id = sp.yunit_id AND sp.student_id = $2
        WHERE l.bahagi_id = $1
        ORDER BY l.lesson_order ASC, l.created_at ASC`,
       [bahagiId, studentId || null]
@@ -74,6 +78,9 @@ export async function GET(request: NextRequest) {
         xp_earned: lesson.completed ? LESSON_COMPLETION_XP : 0,
         coins_earned: parseInt(lesson.coins_earned),
         completion_date: lesson.completion_date,
+        assessment_answered: Boolean(lesson.assessment_answered),
+        assessment_passed: Boolean(lesson.assessment_passed),
+        assessment_attempts: parseInt(lesson.assessment_attempts || 0, 10),
         assessment_count: assessmentCount,
         isLocked
       };

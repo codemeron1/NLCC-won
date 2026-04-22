@@ -11,12 +11,20 @@ import { AdaptiveQuizScreen } from './AdaptiveQuizScreen';
 import { RewardModal } from './RewardModal';
 import { TeacherLessonsView } from './TeacherLessonsView';
 
+interface StartAssessmentOptions {
+  openAssessmentDirectly?: boolean;
+  isRetake?: boolean;
+  nextYunitId?: string | number | null;
+  attemptCount?: number;
+}
+
 type ViewType = 'lessons' | 'classes' | 'bahagis' | 'yunits' | 'lessonContent' | 'assessment' | 'adaptiveQuiz';
 
 interface MagAralPageProps {
   studentId: string;
   studentName: string;
   onNavigate?: (view: string) => void;
+  refreshToken?: number;
 }
 
 interface TeacherInfo {
@@ -30,7 +38,8 @@ interface TeacherInfo {
 export const MagAralPage: React.FC<MagAralPageProps> = ({
   studentId,
   studentName,
-  onNavigate
+  onNavigate,
+  refreshToken = 0,
 }) => {
   const getStoredValue = (key: string): string | null => {
     if (typeof window !== 'undefined') {
@@ -122,6 +131,11 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
   const [selectedTeacherName, setSelectedTeacherName] = useState<string | null>(() => getStoredValue('magAralTeacherName'));
   const [selectedBahagiId, setSelectedBahagiId] = useState<string | number | null>(getInitialBahagiId);
   const [selectedYunitId, setSelectedYunitId] = useState<string | number | null>(getInitialYunitId);
+  const [nextYunitAfterAssessment, setNextYunitAfterAssessment] = useState<string | number | null>(null);
+  const [assessmentRetakeInfo, setAssessmentRetakeInfo] = useState<{ isRetake: boolean; previousAttempts: number }>({
+    isRetake: false,
+    previousAttempts: 0,
+  });
 
   // Save navigation state to localStorage whenever it changes
   useEffect(() => {
@@ -238,9 +252,14 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
     setCurrentView('yunits');
   };
 
-  const handleStartAssessment = (yunitId: string | number) => {
+  const handleStartAssessment = (yunitId: string | number, options?: StartAssessmentOptions) => {
     setSelectedYunitId(yunitId);
-    setCurrentView('lessonContent');
+    setNextYunitAfterAssessment(options?.nextYunitId ?? null);
+    setAssessmentRetakeInfo({
+      isRetake: Boolean(options?.isRetake),
+      previousAttempts: options?.attemptCount || 0,
+    });
+    setCurrentView(options?.openAssessmentDirectly ? 'assessment' : 'lessonContent');
   };
 
   const handleStartQuiz = (bahagiId: string) => {
@@ -248,8 +267,9 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
     setCurrentView('adaptiveQuiz');
   };
 
-  const handleLessonComplete = () => {
-    // Move from lesson content to assessment (called after last yunit)
+  const handleLessonComplete = (options?: { nextYunitId?: string | number | null }) => {
+    setNextYunitAfterAssessment(options?.nextYunitId ?? null);
+    setAssessmentRetakeInfo({ isRetake: false, previousAttempts: 0 });
     setCurrentView('assessment');
   };
 
@@ -269,13 +289,9 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
     setShowRewardModal(true);
   };
 
-  const handleCloseReward = () => {
-    setShowRewardModal(false);
-    
-    // Refresh YunitView to show updated progress
+  const refreshYunitProgressCache = () => {
     setYunitViewKey(prev => prev + 1);
-    
-    // Invalidate yunits cache for this specific bahagi to fetch fresh data
+
     if (selectedBahagiId) {
       setYunitsCache(prev => {
         const newCache = { ...prev };
@@ -283,8 +299,37 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
         return newCache;
       });
     }
-    
-    // Go back to yunits view after assessment
+  };
+
+  const handleClaimReward = () => {
+    setShowRewardModal(false);
+    refreshYunitProgressCache();
+
+    if (nextYunitAfterAssessment) {
+      setSelectedYunitId(nextYunitAfterAssessment);
+      setCurrentView('lessonContent');
+    } else {
+      setCurrentView('yunits');
+    }
+
+    setNextYunitAfterAssessment(null);
+    setAssessmentRetakeInfo({ isRetake: false, previousAttempts: 0 });
+    onNavigate?.('missions');
+  };
+
+  const handleContinueReward = () => {
+    setShowRewardModal(false);
+    refreshYunitProgressCache();
+
+    if (nextYunitAfterAssessment) {
+      setSelectedYunitId(nextYunitAfterAssessment);
+      setNextYunitAfterAssessment(null);
+      setAssessmentRetakeInfo({ isRetake: false, previousAttempts: 0 });
+      setCurrentView('lessonContent');
+      return;
+    }
+
+    setAssessmentRetakeInfo({ isRetake: false, previousAttempts: 0 });
     setCurrentView('yunits');
   };
 
@@ -335,6 +380,8 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
           teacherName={selectedTeacherName || 'Your Teacher'}
           className={selectedClassName || 'Your Class'}
           cachedData={lessonsCache}
+          refreshToken={refreshToken}
+          onDataFetched={(data) => setLessonsCache(data)}
           onYunitsCached={(bahagiId, data) => {
             const key = String(bahagiId);
             setYunitsCache(prev => ({
@@ -375,6 +422,7 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
           studentId={studentId}
           bahagiId={selectedBahagiId}
           cachedData={yunitsCache[String(selectedBahagiId)]}
+          refreshToken={refreshToken}
           onDataFetched={(data) => {
             setYunitsCache(prev => ({
               ...prev,
@@ -403,6 +451,8 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
           studentId={studentId}
           yunitId={selectedYunitId}
           bahagiId={selectedBahagiId}
+          isRetake={assessmentRetakeInfo.isRetake}
+          previousAttempts={assessmentRetakeInfo.previousAttempts}
           onComplete={handleAssessmentComplete}
           onBack={() => setCurrentView('yunits')}
         />
@@ -420,11 +470,14 @@ export const MagAralPage: React.FC<MagAralPageProps> = ({
       <RewardModal
         isOpen={showRewardModal}
         isPassed={rewardData?.isPassed || false}
+        isRetake={rewardData?.isRetake || false}
         scorePercentage={rewardData?.scorePercentage || 0}
         xpEarned={rewardData?.xpEarned || 0}
         coinsEarned={rewardData?.coinsEarned || 0}
         message={rewardData?.message || ''}
-        onClose={handleCloseReward}
+        continueLabel={nextYunitAfterAssessment ? 'Magpatuloy sa Susunod na Yunit' : 'Bumalik sa mga Yunit'}
+        onClaimRewards={handleClaimReward}
+        onContinue={handleContinueReward}
       />
     </>
   );

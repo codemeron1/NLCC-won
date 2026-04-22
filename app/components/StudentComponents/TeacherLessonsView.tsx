@@ -12,6 +12,8 @@ interface TeacherLessonsViewProps {
   teacherName: string;
   className: string;
   cachedData?: any; // Pre-fetched lessons data
+  refreshToken?: number;
+  onDataFetched?: (data: any) => void;
   onYunitsCached?: (bahagiId: string, data: any) => void; // Callback to cache yunits data
   onSelectLesson: (bahagiId: string) => void;
   onStartQuiz?: (bahagiId: string) => void;
@@ -45,6 +47,8 @@ const TeacherLessonsViewComponent: React.FC<TeacherLessonsViewProps> = ({
   teacherName,
   className,
   cachedData,
+  refreshToken = 0,
+  onDataFetched,
   onYunitsCached,
   onSelectLesson,
   onStartQuiz,
@@ -79,14 +83,11 @@ const TeacherLessonsViewComponent: React.FC<TeacherLessonsViewProps> = ({
   }, [cachedData]);
 
   useEffect(() => {
-    // Skip fetching if we already have cached data
-    if (cachedData) {
-      return;
-    }
-
     const fetchLessons = async () => {
       try {
-        setIsLoading(true);
+        if (!cachedData) {
+          setIsLoading(true);
+        }
         setError(null);
         
         const result = await apiClient.student.getTeacherLessons(studentId, teacherId);
@@ -104,6 +105,10 @@ const TeacherLessonsViewComponent: React.FC<TeacherLessonsViewProps> = ({
           return sum + (lesson.xpReward * lesson.totalYunits);
         }, 0);
         setTotalXp(total);
+
+        if (onDataFetched) {
+          onDataFetched(result);
+        }
       } catch (err: any) {
         console.error('Failed to fetch teacher lessons:', err);
         setError(err.message || 'Failed to load lessons');
@@ -115,7 +120,7 @@ const TeacherLessonsViewComponent: React.FC<TeacherLessonsViewProps> = ({
     if (studentId && teacherId) {
       fetchLessons();
     }
-  }, [studentId, teacherId, cachedData]);
+  }, [studentId, teacherId, refreshToken]);
 
   // Pre-fetch all yunits for all lessons when lessons are loaded
   useEffect(() => {

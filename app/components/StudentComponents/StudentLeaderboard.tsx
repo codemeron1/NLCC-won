@@ -15,9 +15,10 @@ interface StudentRank {
 
 interface StudentLeaderboardProps {
     studentId: string;
+    refreshToken?: number;
 }
 
-export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({ studentId }) => {
+export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({ studentId, refreshToken = 0 }) => {
     const [leaderboard, setLeaderboard] = useState<StudentRank[]>([]);
     const [gradeLevel, setGradeLevel] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
@@ -28,7 +29,15 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({ studentI
             try {
                 setIsLoading(true);
                 setError(null);
-                const response = await fetch('/api/student/leaderboard', {
+                const storedClassId = typeof window !== 'undefined'
+                    ? localStorage.getItem('magAralClassId')
+                    : null;
+
+                const leaderboardUrl = storedClassId
+                    ? `/api/student/leaderboard?classId=${encodeURIComponent(storedClassId)}`
+                    : '/api/student/leaderboard';
+
+                const response = await fetch(leaderboardUrl, {
                     headers: {
                         'x-student-id': studentId,
                     },
@@ -110,8 +119,8 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({ studentI
                     <h1 className="text-4xl font-black text-white mb-2">🏆 Listahan ng Lider</h1>
                     <p className="text-slate-400">
                         {gradeLevel
-                            ? `Makita kung sino ang nangungunang estudyante sa ${gradeLevel}`
-                            : 'Makita kung sino ang nangungunang estudyante'}
+                            ? `Makita kung sino ang nangungunang estudyante sa klase: ${gradeLevel}`
+                            : 'Makita kung sino ang nangungunang estudyante sa inyong klase'}
                     </p>
                 </div>
 
@@ -141,7 +150,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({ studentI
                                     </div>
                                     <div className="text-right">
                                         <div className="text-2xl font-black text-brand-purple">{student.xp}</div>
-                                        <p className="text-xs text-slate-400">Available XP</p>
+                                        <p className="text-xs text-slate-400">XP Achieved</p>
                                     </div>
                                 </div>
                             </motion.div>
@@ -177,7 +186,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({ studentI
                     transition={{ delay: 0.8 }}
                     className="mt-8 p-4 bg-brand-purple/10 border border-brand-purple/30 rounded-lg text-sm text-slate-300"
                 >
-                    💡 <span className="text-brand-purple font-semibold">Tip:</span> Ang XP dito ay kapareho ng Available XP na nakikita sa Mag-aral page ng bawat estudyante sa parehong grade level.
+                    💡 <span className="text-brand-purple font-semibold">Tip:</span> Ang XP dito ay ang kasalukuyang XP ng mga estudyanteng naka-enroll sa parehong klase at guro.
                 </motion.div>
             </motion.div>
         </div>

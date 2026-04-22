@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import { apiClient } from '@/lib/api-client';
 import { InteractiveSuriinPage } from './InteractiveSuriinPage';
 import { InteractivePagyamaninPage } from './InteractivePagyamaninPage';
 import { CompletionCelebration } from './CompletionCelebration';
@@ -13,7 +14,7 @@ interface LessonContentViewProps {
   bahagiId: string | number;
   studentId: string;
   cachedYunits?: LessonData[];
-  onComplete: () => void;
+  onComplete: (options?: { nextYunitId?: string | number | null }) => void;
   onNextYunit: (yunitId: string | number) => void;
   onBack: () => void;
 }
@@ -52,6 +53,8 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
   const [showPagyamaninPage, setShowPagyamaninPage] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [completionRewards, setCompletionRewards] = useState({ xp: 0, coins: 0 });
+  const [pendingNextYunitId, setPendingNextYunitId] = useState<string | number | null>(null);
+  const [shouldOpenAssessment, setShouldOpenAssessment] = useState(false);
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const [isYunitAudioPlaying, setIsYunitAudioPlaying] = useState(false);
   const topicAudioRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({});
@@ -178,6 +181,8 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
       setShowPagyamaninPage(false);
       setShowCelebration(false);
       setCompletionRewards({ xp: 0, coins: 0 });
+      setPendingNextYunitId(null);
+      setShouldOpenAssessment(false);
       completionPromiseRef.current = null;
       celebrationShownRef.current = false;
       
@@ -246,6 +251,21 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
       xp: Number(result?.rewards?.xp) || LESSON_COMPLETION_XP,
       coins: Number(result?.rewards?.coins) || 0,
     });
+  };
+
+  const hasAssignedAssessment = async (currentYunitId: string | number) => {
+    try {
+      const response = await apiClient.assessment.fetch({
+        yunit_id: Number(currentYunitId),
+        student_view: true,
+        first_only: true,
+      });
+
+      return Boolean(response.data?.assessments?.length);
+    } catch (error) {
+      console.error('[LessonContentView] Failed to check assessment for yunit:', error);
+      return false;
+    }
   };
 
   // Extract plain text from discussion (handles JSON topics or legacy text)
@@ -429,30 +449,36 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
                              content?.includes('ipakilala ang iyong sarili');
 
   // Handle completion with celebration before transitioning to assessment.
-  const handleComplete = () => {
+  const handleComplete = async (nextYunitId?: string | number | null) => {
     if (celebrationShownRef.current) {
       return;
     }
 
     celebrationShownRef.current = true;
+    const result = await saveLessonCompletion();
+    applyCompletionRewards(result);
+    setPendingNextYunitId(nextYunitId ?? null);
+    setShouldOpenAssessment(await hasAssignedAssessment(yunitId));
     setCompletionRewards((currentRewards) => ({
       xp: currentRewards.xp || LESSON_COMPLETION_XP,
       coins: currentRewards.coins || 0,
     }));
     setShowCelebration(true);
-
-    void saveLessonCompletion()
-      .then((result) => {
-        applyCompletionRewards(result);
-      })
-      .catch((error) => {
-        console.error('[Lesson Complete] Failed to save:', error);
-      });
   };
 
   const handleCelebrationComplete = () => {
     setShowCelebration(false);
-    onComplete();
+    if (shouldOpenAssessment) {
+      onComplete({ nextYunitId: pendingNextYunitId });
+      return;
+    }
+
+    if (pendingNextYunitId) {
+      onNextYunit(pendingNextYunitId);
+      return;
+    }
+
+    onBack();
   };
 
   // Show celebration screen
@@ -460,7 +486,20 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
     return (
       <CompletionCelebration
         onContinue={handleCelebrationComplete}
-        message="Natapos mo na ang aralin! Magaling!"
+        message={
+          shouldOpenAssessment
+            ? 'Natapos mo na ang aralin! Susunod ang iyong assessment.'
+            : pendingNextYunitId
+              ? 'Natapos mo na ang aralin! Susunod na ang kasunod na Yunit.'
+              : 'Natapos mo na ang aralin! Magaling!'
+        }
+        nextStepLabel={
+          shouldOpenAssessment
+            ? 'Simulan ang Assessment'
+            : pendingNextYunitId
+              ? 'Pumunta sa Susunod na Yunit'
+              : 'Bumalik sa mga Yunit'
+        }
         xpEarned={completionRewards.xp}
         coinsEarned={completionRewards.coins}
       />
@@ -474,18 +513,9 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
         imageUrl={lesson.media_url}
         onBack={() => setShowPagyamaninPage(false)}
         onNext={async () => {
-          // Mark current lesson as complete
-          const result = await saveLessonCompletion();
-          
           const nextYunit = allYunits[currentIndex + 1];
-          if (nextYunit) {
-            setShowPagyamaninPage(false);
-            onNextYunit(nextYunit.id);
-          } else {
-            setShowPagyamaninPage(false);
-            applyCompletionRewards(result);
-            handleComplete();
-          }
+          setShowPagyamaninPage(false);
+          await handleComplete(nextYunit?.id ?? null);
         }}
       />
     );
@@ -499,18 +529,9 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
         totalLessons={allYunits.length}
         onBack={() => setShowInteractivePage(false)}
         onNext={async () => {
-          // Mark current lesson as complete
-          const result = await saveLessonCompletion();
-          
           const nextYunit = allYunits[currentIndex + 1];
-          if (nextYunit) {
-            setShowInteractivePage(false);
-            onNextYunit(nextYunit.id);
-          } else {
-            setShowInteractivePage(false);
-            applyCompletionRewards(result);
-            handleComplete();
-          }
+          setShowInteractivePage(false);
+          await handleComplete(nextYunit?.id ?? null);
         }}
       />
     );
@@ -814,11 +835,8 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
                     } else if (isPagyamaninLesson) {
                       setShowPagyamaninPage(true);
                     } else {
-                      await saveLessonCompletion();
                       const nextYunit = allYunits[currentIndex + 1];
-                      if (nextYunit) {
-                        onNextYunit(nextYunit.id);
-                      }
+                      await handleComplete(nextYunit?.id ?? null);
                     }
                   }}
                   className="px-8 py-3 bg-brand-purple hover:bg-brand-purple/80 text-white rounded-xl font-bold text-base transition-all shadow-lg hover:shadow-brand-purple/40 hover:scale-105"
@@ -829,14 +847,14 @@ export const LessonContentView: React.FC<LessonContentViewProps> = ({
 
               {currentIndex === allYunits.length - 1 && (
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     stopAllAudio();
                     if (isSuriinLesson) {
                       setShowInteractivePage(true);
                     } else if (isPagyamaninLesson) {
                       setShowPagyamaninPage(true);
                     } else {
-                      handleComplete();
+                      await handleComplete();
                     }
                   }}
                   className="px-8 py-3 bg-brand-purple hover:bg-brand-purple/80 text-white rounded-xl font-bold text-base transition-all shadow-lg hover:shadow-brand-purple/40 hover:scale-105"

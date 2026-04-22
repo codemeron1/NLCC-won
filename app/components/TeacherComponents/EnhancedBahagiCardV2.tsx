@@ -85,7 +85,7 @@ export const EnhancedBahagiCardV2: React.FC<EnhancedBahagiCardProps> = ({
                         className="w-full flex items-center gap-4 hover:gap-5 transition"
                     >
                         {/* Icon Display */}
-                        <div className="relative flex-shrink-0">
+                        <div className="relative shrink-0">
                             <div className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-purple-500/30 bg-slate-700 shadow-md hover:shadow-lg transition">
                                 <img
                                     src={displayIcon}
@@ -252,7 +252,7 @@ export const EnhancedBahagiCardV2: React.FC<EnhancedBahagiCardProps> = ({
                         initial={{ scale: 0.95 }}
                         animate={{ scale: 1 }}
                         exit={{ scale: 0.95 }}
-                        className="bg-slate-900 rounded-[2rem] p-8 max-w-sm shadow-2xl border border-slate-800"
+                        className="bg-slate-900 rounded-4xl p-8 max-w-sm shadow-2xl border border-slate-800"
                         onClick={e => e.stopPropagation()}
                     >
                         <h3 className="text-2xl font-black text-white mb-3">Delete Bahagi?</h3>
@@ -293,7 +293,7 @@ export const EnhancedBahagiCardV2: React.FC<EnhancedBahagiCardProps> = ({
                         initial={{ scale: 0.95 }}
                         animate={{ scale: 1 }}
                         exit={{ scale: 0.95 }}
-                        className="bg-slate-900 rounded-[2rem] p-8 max-w-sm shadow-2xl border border-slate-800"
+                        className="bg-slate-900 rounded-4xl p-8 max-w-sm shadow-2xl border border-slate-800"
                         onClick={e => e.stopPropagation()}
                     >
                         <h3 className="text-2xl font-black text-white mb-3">Archive Bahagi?</h3>

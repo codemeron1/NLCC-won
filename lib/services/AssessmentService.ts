@@ -111,6 +111,10 @@ export class AssessmentService {
             option_text: option?.option_text ?? option?.text ?? '',
             text: option?.text ?? option?.option_text ?? '',
             option_order: option?.option_order ?? optionIndex,
+            match: option?.match ?? option?.correctMatch ?? '',
+            correctMatch: option?.correctMatch ?? option?.match ?? '',
+            media: option?.media ?? null,
+            matchMedia: option?.matchMedia ?? null,
           };
 
           if (options?.studentView) {
@@ -277,16 +281,25 @@ export class AssessmentService {
       ?? normalizedQuestions.reduce((sum: number, question: any) => sum + (Number(question?.xp) || 0), 0)
       ?? (current as any).points
       ?? 0;
+    const nextBahagiId = input.bahagi_id !== undefined ? Number(input.bahagi_id) : Number((current as any).bahagi_id);
+    const nextLessonIdRaw = input.yunit_id ?? input.lesson_id ?? (current as any).lesson_id;
+    const nextLessonId = nextLessonIdRaw !== undefined && nextLessonIdRaw !== null && Number(nextLessonIdRaw) > 0
+      ? Number(nextLessonIdRaw)
+      : null;
 
     const result = await repositories.assessment.raw(`
       UPDATE bahagi_assessment
-      SET title = $1,
-          type = $2,
-          content = $3,
+      SET bahagi_id = $1,
+          lesson_id = $2,
+          title = $3,
+          type = $4,
+          content = $5,
           updated_at = NOW()
-      WHERE id = $4
+      WHERE id = $6
       RETURNING id, bahagi_id, lesson_id, title, type, content, assessment_order, is_published, is_archived, created_at, updated_at
     `, [
+      nextBahagiId,
+      nextLessonId,
       input.title || current.title,
       normalizedType,
       JSON.stringify({
@@ -316,13 +329,17 @@ export class AssessmentService {
   /**
    * List assessments for a Bahagi
    */
-  static async listByBahagi(bahagiId: string | number, options?: { studentView?: boolean }) {
+  static async listByBahagi(bahagiId: string | number, options?: { studentView?: boolean; includeArchived?: boolean }) {
     // Convert to number if string (bahagi_id is INTEGER in DB)
     const bahagiIdNum = typeof bahagiId === 'string' ? parseInt(bahagiId, 10) : bahagiId;
+    
+    // Filter out archived by default (unless explicitly requested)
+    const archivedFilter = options?.includeArchived ? '' : 'AND is_archived = false';
+    
     const result = await repositories.assessment.raw(`
       SELECT id, bahagi_id, lesson_id, title, type, content, assessment_order, is_published, is_archived, created_at, updated_at
       FROM bahagi_assessment
-      WHERE bahagi_id = $1
+      WHERE bahagi_id = $1 ${archivedFilter}
       ORDER BY assessment_order ASC, created_at DESC
     `, [bahagiIdNum]);
 
@@ -332,11 +349,14 @@ export class AssessmentService {
   /**
    * List assessments for a Yunit (Lesson)
    */
-  static async listByYunit(yunitId: string, options?: { studentView?: boolean; firstOnly?: boolean }) {
+  static async listByYunit(yunitId: string, options?: { studentView?: boolean; firstOnly?: boolean; includeArchived?: boolean }) {
+    // Filter out archived by default (unless explicitly requested)
+    const archivedFilter = options?.includeArchived ? '' : 'AND is_archived = false';
+    
     const result = await repositories.assessment.raw(`
       SELECT id, bahagi_id, lesson_id, title, type, content, assessment_order, is_published, is_archived, created_at, updated_at
       FROM bahagi_assessment
-      WHERE lesson_id = $1
+      WHERE lesson_id = $1 ${archivedFilter}
       ORDER BY assessment_order ASC, created_at DESC
     `, [yunitId]);
 

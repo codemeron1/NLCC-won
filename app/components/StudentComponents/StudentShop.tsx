@@ -127,18 +127,39 @@ export const StudentShop: React.FC<StudentShopProps> = ({ userId }) => {
                 setIsLoading(true);
                 setError(null);
 
+                // Fetch shop items
                 const itemsResult = await apiClient.student.getShopItems();
-                if (itemsResult.success && itemsResult.data) {
-                    const enrichedItems = itemsResult.data.map((item: any) => ({
-                        ...item,
-                        icon: getCategoryIcon(item.category),
-                    }));
-                    setItems(enrichedItems);
-                } else {
-                    setError('Failed to load shop items');
-                    setItems(getMockItems());
+                let shopItems = itemsResult.success && itemsResult.data ? itemsResult.data : getMockItems();
+                
+                // Fetch student inventory to mark owned items
+                let ownedItemIds: string[] = [];
+                try {
+                    const inventoryResponse = await fetch('/api/student/inventory', {
+                        headers: {
+                            'x-student-id': userId,
+                        },
+                        cache: 'no-store',
+                    });
+                    if (inventoryResponse.ok) {
+                        const inventoryResult = await inventoryResponse.json();
+                        if (inventoryResult.success && inventoryResult.data) {
+                            ownedItemIds = inventoryResult.data.map((inv: any) => String(inv.item_id));
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Could not fetch inventory:', err);
                 }
 
+                // Mark owned items
+                const enrichedItems = shopItems.map((item: any) => ({
+                    ...item,
+                    id: String(item.id),
+                    icon: getCategoryIcon(item.category),
+                    owned: ownedItemIds.includes(String(item.id)),
+                }));
+                setItems(enrichedItems);
+
+                // Fetch student coins
                 const statsResponse = await fetch('/api/student/stats', {
                     headers: {
                         'x-student-id': userId,
@@ -210,16 +231,28 @@ export const StudentShop: React.FC<StudentShopProps> = ({ userId }) => {
         }
     };
 
-    const handleBuyItem = (item: ShopItem) => {
+    const handleBuyItem = async (item: ShopItem) => {
         if (coins >= item.price) {
-            setCoins(coins - item.price);
-            // TODO: Send purchase request to API
-            const updatedItems = items.map((i) =>
-                i.id === item.id ? { ...i, owned: true } : i
-            );
-            setItems(updatedItems);
-            // Immediately close modal after purchase
-            setSelectedItem(null);
+            try {
+                const response = await apiClient.student.purchaseItem(item.id, 1);
+                if (response.success) {
+                    // Update coins and mark item as owned
+                    setCoins(coins - item.price);
+                    const updatedItems = items.map((i) =>
+                        i.id === item.id ? { ...i, owned: true } : i
+                    );
+                    setItems(updatedItems);
+                    // Show success feedback
+                    console.log(`Successfully purchased ${item.name}!`);
+                    // Immediately close modal after purchase
+                    setSelectedItem(null);
+                } else {
+                    setError(`Purchase failed: ${response.error || 'Unknown error'}`);
+                }
+            } catch (err) {
+                console.error('Purchase error:', err);
+                setError('Failed to process purchase. Please try again.');
+            }
         }
     };
 

@@ -69,7 +69,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     // Badges state
     const [completedMissions, setCompletedMissions] = useState<any[]>([]);
     const [trophies, setTrophies] = useState<any[]>([]);
-    const [badgesLoaded, setBadgesLoaded] = useState(false);
+    const [lessonsRefreshToken, setLessonsRefreshToken] = useState(0);
+    const [leadersRefreshToken, setLeadersRefreshToken] = useState(0);
+    const [missionsRefreshToken, setMissionsRefreshToken] = useState(0);
 
     // Save active tab to localStorage when it changes
     useEffect(() => {
@@ -81,6 +83,20 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             ...prev,
             [activeTab]: true,
         }));
+    }, [activeTab]);
+
+    useEffect(() => {
+        if (activeTab === 'lessons') {
+            setLessonsRefreshToken((prev) => prev + 1);
+        }
+
+        if (activeTab === 'leaders') {
+            setLeadersRefreshToken((prev) => prev + 1);
+        }
+
+        if (activeTab === 'missions') {
+            setMissionsRefreshToken((prev) => prev + 1);
+        }
     }, [activeTab]);
 
     const tabs = [
@@ -115,7 +131,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
     // Fetch badges (completed missions + trophies) when profile tab is visited
     useEffect(() => {
-        if (activeTab !== 'profile' || badgesLoaded || !user?.id) return;
+        if (activeTab !== 'profile' || !user?.id) return;
         const fetchBadges = async () => {
             try {
                 const [missionsRes, rewardsRes] = await Promise.all([
@@ -133,12 +149,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 }
             } catch (err) {
                 console.error('Error fetching badges:', err);
-            } finally {
-                setBadgesLoaded(true);
             }
         };
         fetchBadges();
-    }, [activeTab, badgesLoaded, user?.id]);
+    }, [activeTab, user?.id]);
 
     // Handle password change
     const handlePasswordChange = async () => {
@@ -304,8 +318,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                         <MagAralPage
                             studentId={user?.id || ''}
                             studentName={`${user?.firstName} ${user?.lastName}`}
+                            refreshToken={lessonsRefreshToken}
                             onNavigate={(view) => {
-                                // Navigation handler for MagAralPage
+                                if (view === 'missions' || view === 'lessons' || view === 'leaders' || view === 'store' || view === 'avatar' || view === 'profile') {
+                                    setActiveTab(view as TabType);
+                                }
                             }}
                         />
                     </div>
@@ -313,13 +330,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
                 {visitedTabs.leaders && (
                     <div className={activeTab === 'leaders' ? 'w-full' : 'hidden'}>
-                        <StudentLeaderboard studentId={user?.id || ''} />
+                        <StudentLeaderboard studentId={user?.id || ''} refreshToken={leadersRefreshToken} />
                     </div>
                 )}
 
                 {visitedTabs.missions && (
                     <div className={activeTab === 'missions' ? 'w-full' : 'hidden'}>
-                        <StudentMissions />
+                        <StudentMissions refreshToken={missionsRefreshToken} />
                     </div>
                 )}
 
@@ -537,7 +554,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                                 <div className="flex flex-col h-full">
                                     <h3 className="text-2xl font-bold text-white mb-2 text-center">Mga Badge</h3>
                                     <p className="text-slate-400 text-sm text-center mb-4">Mga nakamit mula sa misyon at milestone</p>
-                                    <div className="flex-1 bg-slate-800/30 border border-white/10 rounded-2xl p-4 overflow-y-auto max-h-[600px] space-y-3">
+                                    <div className="flex-1 bg-slate-800/30 border border-white/10 rounded-2xl p-4 overflow-y-auto max-h-150 space-y-3">
                                         {/* Trophies */}
                                         {trophies.length > 0 && trophies.map((trophy: any, i: number) => (
                                             <div key={`trophy-${i}`} className="flex items-center gap-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">

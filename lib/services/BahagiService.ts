@@ -6,6 +6,18 @@
 import { repositories } from '@/lib/database/repository';
 import type { Bahagi } from '@/lib/database/types';
 
+const normalizeBahagiStatus = <T extends Record<string, any>>(bahagi: T): T & { is_published: boolean } => {
+  const normalized = { ...bahagi } as T & { is_published: boolean };
+
+  if (normalized.is_published === undefined && (normalized as any).is_open !== undefined) {
+    normalized.is_published = Boolean((normalized as any).is_open);
+  } else {
+    normalized.is_published = Boolean(normalized.is_published);
+  }
+
+  return normalized;
+};
+
 export class BahagiService {
   /**
    * Create a new Bahagi
@@ -67,8 +79,8 @@ export class BahagiService {
         COALESCE(COUNT(DISTINCT ba.id), 0)::int as "assessmentCount",
         0 as "totalXP"
       FROM bahagi b
-      LEFT JOIN lesson l ON b.id = l.bahagi_id
-      LEFT JOIN bahagi_assessment ba ON b.id = ba.bahagi_id
+      LEFT JOIN lesson l ON b.id = l.bahagi_id AND COALESCE(l.is_archived, false) = false
+      LEFT JOIN bahagi_assessment ba ON b.id = ba.bahagi_id AND COALESCE(ba.is_archived, false) = false
       WHERE ${whereClause}
       GROUP BY b.id
       ORDER BY b.created_at DESC
@@ -76,7 +88,7 @@ export class BahagiService {
 
     try {
       const result = await repositories.bahagi.raw(query, params);
-      return result;
+      return result.map((bahagi) => normalizeBahagiStatus(bahagi));
     } catch (err) {
       console.error('Error fetching bahagi with counts:', err);
       // Fallback to basic query and count separately
@@ -92,22 +104,22 @@ export class BahagiService {
           try {
             // Get lesson count
             const lessonCountResult = await repositories.bahagi.raw(
-              'SELECT COUNT(*) as count FROM lesson WHERE bahagi_id = $1',
+              'SELECT COUNT(*) as count FROM lesson WHERE bahagi_id = $1 AND COALESCE(is_archived, false) = false',
               [b.id]
             );
             const lessonCount = parseInt(lessonCountResult[0]?.count || '0');
 
             // Get assessment count
             const assessmentCountResult = await repositories.bahagi.raw(
-              'SELECT COUNT(*) as count FROM bahagi_assessment WHERE bahagi_id = $1',
+              'SELECT COUNT(*) as count FROM bahagi_assessment WHERE bahagi_id = $1 AND COALESCE(is_archived, false) = false',
               [b.id]
             );
             const assessmentCount = parseInt(assessmentCountResult[0]?.count || '0');
 
-            return { ...b, lessonCount, assessmentCount, totalXP: 0 };
+            return normalizeBahagiStatus({ ...b, lessonCount, assessmentCount, totalXP: 0 });
           } catch (countErr) {
             console.error(`Error counting for bahagi ${b.id}:`, countErr);
-            return { ...b, lessonCount: 0, assessmentCount: 0, totalXP: 0 };
+            return normalizeBahagiStatus({ ...b, lessonCount: 0, assessmentCount: 0, totalXP: 0 });
           }
         })
       );

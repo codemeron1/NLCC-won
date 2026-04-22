@@ -15,6 +15,9 @@ interface Yunit {
   xp_earned: number;
   coins_earned: number;
   assessment_count: number;
+  assessment_answered?: boolean;
+  assessment_passed?: boolean;
+  assessment_attempts?: number;
   isLocked: boolean;
   completion_date?: string;
 }
@@ -23,8 +26,9 @@ interface YunitViewProps {
   studentId: string;
   bahagiId: string | number;
   cachedData?: any;
+  refreshToken?: number;
   onDataFetched?: (data: any) => void;
-  onStartAssessment: (yunitId: string | number) => void;
+  onStartAssessment: (yunitId: string | number, options?: { openAssessmentDirectly?: boolean; isRetake?: boolean; nextYunitId?: string | number | null; attemptCount?: number }) => void;
   onBack: () => void;
 }
 
@@ -32,6 +36,7 @@ const YunitViewComponent: React.FC<YunitViewProps> = ({
   studentId,
   bahagiId,
   cachedData,
+  refreshToken = 0,
   onDataFetched,
   onStartAssessment,
   onBack
@@ -39,6 +44,8 @@ const YunitViewComponent: React.FC<YunitViewProps> = ({
   const [yunits, setYunits] = useState<Yunit[]>([]);
   const [isLoading, setIsLoading] = useState(!cachedData);
   const [error, setError] = useState<string | null>(null);
+  const [repeatDialogYunit, setRepeatDialogYunit] = useState<Yunit | null>(null);
+  const [repeatDialogNextYunitId, setRepeatDialogNextYunitId] = useState<string | number | null>(null);
 
   // Use cached data immediately if available
   useEffect(() => {
@@ -50,16 +57,16 @@ const YunitViewComponent: React.FC<YunitViewProps> = ({
   }, [cachedData]);
 
   useEffect(() => {
-    // Skip fetching if we already have cached data
-    if (cachedData) {
-      return;
-    }
-
     const fetchYunits = async () => {
       try {
-        setIsLoading(true);
+        if (!cachedData) {
+          setIsLoading(true);
+        }
+        setError(null);
         
-        const response = await fetch(`/api/student/yunits-progress?bahagiId=${bahagiId}&studentId=${studentId}`);
+        const response = await fetch(`/api/student/yunits-progress?bahagiId=${bahagiId}&studentId=${studentId}`, {
+          cache: 'no-store'
+        });
         const data = await response.json();
         
         if (data.success && data.data) {
@@ -81,7 +88,7 @@ const YunitViewComponent: React.FC<YunitViewProps> = ({
     };
 
     fetchYunits();
-  }, [studentId, bahagiId, cachedData, onDataFetched]);
+  }, [studentId, bahagiId, refreshToken, onDataFetched]);
 
   if (isLoading) {
     return (
@@ -146,7 +153,21 @@ const YunitViewComponent: React.FC<YunitViewProps> = ({
               className="relative"
             >
               <button
-                onClick={() => !yunit.isLocked && onStartAssessment(yunit.id)}
+                onClick={() => {
+                  if (yunit.isLocked) {
+                    return;
+                  }
+
+                  const nextYunitId = yunits[idx + 1]?.id ?? null;
+
+                  if (yunit.completed && yunit.assessment_answered) {
+                    setRepeatDialogYunit(yunit);
+                    setRepeatDialogNextYunitId(nextYunitId);
+                    return;
+                  }
+
+                  onStartAssessment(yunit.id, { nextYunitId });
+                }}
                 disabled={yunit.isLocked}
                 className={`w-full h-full p-6 rounded-2xl border-2 transition-all text-left relative overflow-hidden group ${
                   yunit.isLocked
@@ -202,6 +223,11 @@ const YunitViewComponent: React.FC<YunitViewProps> = ({
                             🪙 +{yunit.coins_earned}
                           </span>
                         )}
+                        {Boolean(yunit.assessment_answered) && (
+                          <span className="text-cyan-400 font-bold">
+                            📝 {yunit.assessment_attempts || 1} assessment attempt{(yunit.assessment_attempts || 1) > 1 ? 's' : ''}
+                          </span>
+                        )}
                       </div>
                     ) : !yunit.isLocked ? (
                       <div className="flex items-center gap-2">
@@ -238,6 +264,78 @@ const YunitViewComponent: React.FC<YunitViewProps> = ({
       {error && (
         <div className="bg-red-500/20 border border-red-500 rounded-lg p-4 text-red-300">
           {error}
+        </div>
+      )}
+
+      {repeatDialogYunit && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 space-y-5 shadow-2xl">
+            <div className="space-y-2">
+              <p className="text-xs font-black tracking-widest uppercase text-cyan-400">Yunit Tapos Na</p>
+              <h3 className="text-2xl font-black text-white">
+                Natapos mo nang sagutan ang {repeatDialogYunit.title}
+              </h3>
+              <p className="text-slate-400 text-sm">
+                Maaari mo itong ulitin para magsanay. Hindi na ito magbibigay ng panibagong XP o coins.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-700 bg-slate-800/70 p-4 space-y-2 text-sm">
+              <p className="text-white font-bold">Kasaysayan ng Pagsagot</p>
+              <p className="text-slate-300">
+                Kabuuang bilang ng pagsagot: <span className="font-black text-cyan-400">{repeatDialogYunit.assessment_attempts || 1}</span>
+              </p>
+              {(repeatDialogYunit.assessment_attempts || 1) > 1 && (
+                <p className="text-slate-400">
+                  Retake count: {(repeatDialogYunit.assessment_attempts || 1) - 1}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  onStartAssessment(repeatDialogYunit.id, {
+                    openAssessmentDirectly: true,
+                    isRetake: true,
+                    nextYunitId: repeatDialogNextYunitId,
+                    attemptCount: repeatDialogYunit.assessment_attempts || 1,
+                  });
+                  setRepeatDialogYunit(null);
+                  setRepeatDialogNextYunitId(null);
+                }}
+                className="flex-1 rounded-xl bg-brand-purple px-4 py-3 font-bold text-white hover:opacity-90 transition-all"
+              >
+                Ulitin
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (repeatDialogNextYunitId) {
+                    onStartAssessment(repeatDialogNextYunitId, { nextYunitId: yunits.find((item) => item.id === repeatDialogNextYunitId) ? yunits[yunits.findIndex((item) => item.id === repeatDialogNextYunitId) + 1]?.id ?? null : null });
+                  }
+                  setRepeatDialogYunit(null);
+                  setRepeatDialogNextYunitId(null);
+                }}
+                disabled={!repeatDialogNextYunitId}
+                className="flex-1 rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 font-bold text-white hover:bg-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Pumunta sa sunod na Yunit
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setRepeatDialogYunit(null);
+                setRepeatDialogNextYunitId(null);
+              }}
+              className="w-full text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              Isara
+            </button>
+          </div>
         </div>
       )}
     </div>
