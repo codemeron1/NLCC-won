@@ -201,7 +201,7 @@ export function meetsContrastStandard(
  * Skip link for keyboard navigation
  * Add to start of page to allow users to skip to main content
  */
-export const SkipLink = (): JSX.Element => (
+export const SkipLink = (): React.ReactElement => (
   <a
     href="#main-content"
     className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:bg-brand-purple focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:z-50"
