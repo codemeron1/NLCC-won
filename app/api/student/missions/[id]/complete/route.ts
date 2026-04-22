@@ -11,7 +11,7 @@ export async function POST(
 ) {
   try {
     const studentId = request.headers.get("x-student-id");
-    const missionId = await params.id;
+   const { id: missionId } = await params;
 
     if (!studentId) {
       return NextResponse.json(
@@ -133,7 +133,7 @@ export async function DELETE(
 ) {
   try {
     const studentId = request.headers.get("x-student-id");
-    const missionId = await params.id;
+    const { id: missionId } = await params;
 
     if (!studentId || !missionId) {
       return NextResponse.json(
